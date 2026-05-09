@@ -31,12 +31,11 @@ USER appuser
 
 ENV DATABASE_URL=sqlite+aiosqlite:////data/acescraper.db \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    APP_PORT=8000
+    PYTHONUNBUFFERED=1
 
-EXPOSE ${APP_PORT}
+EXPOSE 7777
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.getenv(\"APP_PORT\",\"8000\")}/api/config/')"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7777/api/config/')"
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT}"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7777"]
