@@ -51,7 +51,7 @@ services:
     container_name: acescraper
     restart: unless-stopped
     ports:
-      - "${PORT:-8888}:8000"
+      - "${PORT:-8888}:${APP_PORT:-8000}"
     volumes:
       - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -60,11 +60,12 @@ services:
     environment:
       DATABASE_URL: sqlite+aiosqlite:////data/acescraper.db
       LOGOS_DIR: /data/logos
+      APP_PORT: ${APP_PORT:-8000}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       #TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS:-}
     healthcheck:
       test: ["CMD", "python", "-c",
-             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/config/')"]
+             "import os,urllib.request; urllib.request.urlopen(f'http://localhost:{os.getenv(\"APP_PORT\",\"8000\")}/api/config/')"]
       interval: 30s
       timeout: 5s
       start_period: 15s
