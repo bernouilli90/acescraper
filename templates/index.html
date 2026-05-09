@@ -1,0 +1,3074 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AceScraper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+            mono: ['JetBrains Mono', 'ui-monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #21262d;
+      --border:    #30363d;
+      --border2:   #444c56;
+      --text:      #e6edf3;
+      --text-muted:#8b949e;
+      --text-dim:  #6e7681;
+      --accent:    #58a6ff;
+      --accent-bg: #1f3352;
+      --green:     #3fb950;
+      --green-bg:  #1a3428;
+      --red:       #f85149;
+      --red-bg:    #3d1c1c;
+      --yellow:    #e3b341;
+      --yellow-bg: #332d16;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    .nav-links { margin-left: auto; display: flex; gap: 1.25rem; align-items: center; }
+    .nav-links a {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-decoration: none;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      transition: all .15s;
+    }
+    .nav-links a:hover { color: var(--accent); border-color: var(--border2); background: var(--surface2); }
+    .nav-links a.export { background: var(--accent-bg); color: var(--accent); border-color: #254473; }
+    .nav-links a.export:hover { background: #254473; }
+
+    /* ── Tabs ── */
+    .tabs {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      gap: 0;
+    }
+    .tab-btn {
+      padding: 0.85rem 1.1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .card-body { padding: 1.25rem; }
+    .card-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.45rem 0.9rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: #238636;
+      border-color: #2ea043;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #2ea043; }
+    .btn-accent {
+      background: var(--accent-bg);
+      border-color: #254473;
+      color: var(--accent);
+    }
+    .btn-accent:hover { background: #254473; }
+    .btn-danger {
+      background: var(--red-bg);
+      border-color: #6e2020;
+      color: var(--red);
+      padding: 0.35rem 0.7rem;
+      font-size: 0.75rem;
+    }
+    .btn-danger:hover { background: #5a1c1c; border-color: var(--red); }
+    .btn-ghost {
+      background: var(--surface2);
+      border-color: var(--border2);
+      color: var(--text);
+      padding: 0.45rem 0.9rem;
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.75rem; }
+
+    /* ── Inputs ── */
+    input:not([type=checkbox]):not([type=file]),
+    select,
+    textarea {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.875rem;
+      color: var(--text);
+      width: 100%;
+      font-family: inherit;
+      transition: border-color .15s, box-shadow .15s;
+      outline: none;
+    }
+    input:not([type=checkbox]):not([type=file]):focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(88,166,255,.15);
+    }
+    input::placeholder, textarea::placeholder { color: var(--text-dim); }
+    select option { background: var(--surface2); }
+
+    input[type=file] {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      width: 100%;
+      cursor: pointer;
+    }
+    input[type=checkbox] {
+      accent-color: var(--accent);
+      width: 1rem; height: 1rem;
+      cursor: pointer;
+    }
+
+    label.field-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    /* ── Tables ── */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    thead { background: var(--surface2); }
+    th {
+      text-align: left;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--text-muted);
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 0.65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text);
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--surface2); }
+    .empty-row td { text-align: center; color: var(--text-dim); padding: 2.5rem; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .badge-blue   { background: var(--accent-bg); color: var(--accent);  border-color: #254473; }
+    .badge-green  { background: var(--green-bg);  color: var(--green);   border-color: #1f4d35; }
+    .badge-gray   { background: var(--surface2);  color: var(--text-muted); border-color: var(--border2); }
+    .badge-red    { background: var(--red-bg);    color: var(--red);     border-color: #6e2020; }
+    .badge-yellow { background: var(--yellow-bg); color: var(--yellow);  border-color: #4d4122; }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* ── Modals ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(1,4,9,.75);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      backdrop-filter: blur(2px);
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 460px;
+      padding: 1.5rem;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+    .modal-header h3 { font-size: 1rem; font-weight: 700; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      transition: color .15s;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; }
+
+    /* ── Misc ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+    .note { font-size: 0.75rem; color: var(--text-dim); }
+    .success-msg { font-size: 0.8rem; color: var(--green); min-height: 1.2em; }
+    .hash-text { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); }
+    .mono-sm   { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.15rem 0.4rem;
+      color: var(--accent);
+    }
+
+    .grid-import { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    @media (min-width: 768px) { .grid-import { grid-template-columns: repeat(3, 1fr); } }
+    .grid-2 { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+    @media (min-width: 640px) { .grid-2 { grid-template-columns: 2fr 1fr; } }
+
+    /* Selected row highlight */
+    tr.row-selected td { background: rgba(88,166,255,.08) !important; }
+    tr.row-selected:hover td { background: rgba(88,166,255,.14) !important; }
+
+    /* Filter bar responsive */
+    .filter-bar { display:grid; grid-template-columns:1fr 1fr auto auto auto auto; gap:.6rem; align-items:end; }
+    @media (max-width: 900px) { .filter-bar { grid-template-columns:1fr 1fr; } }
+    @media (max-width: 580px) { .filter-bar { grid-template-columns:1fr; } }
+
+    .space-y > * + * { margin-top: 1rem; }
+    .space-s > * + * { margin-top: 0.5rem; }
+    .flex-row { display: flex; gap: 0.5rem; align-items: flex-end; }
+    .flex-center { display: flex; align-items: center; gap: 0.5rem; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+    /* ── Group pill (clickable) ── */
+    .group-pill {
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .2rem .55rem;
+      border-radius: 20px; font-size: .7rem; font-weight: 600;
+      background: var(--accent-bg); color: var(--accent); border: 1px solid #254473;
+      cursor: pointer; transition: background .15s;
+      user-select: none;
+    }
+    .group-pill:hover { background: #254473; }
+
+    .edit-groups-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 4px;
+      background: none; border: 1px solid var(--border2);
+      color: var(--text-muted); font-size: .75rem; cursor: pointer;
+      transition: all .15s; flex-shrink: 0;
+    }
+    .edit-groups-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+
+    /* ── Channel list inside group modal ── */
+    .ch-list-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .4rem .6rem; border-radius: 6px;
+      background: var(--surface2); border: 1px solid var(--border);
+      font-size: .85rem;
+    }
+    .ch-list-item + .ch-list-item { margin-top: .35rem; }
+
+    .modal-scroll { max-height: 260px; overflow-y: auto; padding-right: 2px; }
+
+    /* ── SearchableSelect ── */
+    .ss-wrap { position: relative; }
+    .ss-dropdown {
+      position: absolute;
+      top: calc(100% + 2px);
+      left: 0; right: 0;
+      background: var(--surface2);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      z-index: 300;
+      max-height: 220px;
+      overflow-y: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,.55);
+    }
+    .ss-opt {
+      padding: .42rem .75rem;
+      font-size: .875rem;
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ss-opt:hover  { background: var(--accent-bg); color: var(--accent); }
+    .ss-opt.ss-sel { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+    .ss-none { padding: .42rem .75rem; font-size: .8rem; color: var(--text-dim); }
+
+    /* ── Status panel ────────────────────────────────────────────────────── */
+    #status-panel {
+      position: fixed; bottom: 1.25rem; right: 1.25rem; z-index: 9999;
+      width: 300px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.5);
+      font-size: .8rem;
+      transition: opacity .25s, transform .25s;
+    }
+    #status-panel.sp-hidden  { opacity: 0; pointer-events: none; transform: translateY(12px); }
+    #status-panel.sp-mini    { width: auto; min-width: 140px; }
+    #status-panel.sp-mini .sp-body { display: none; }
+    .sp-header {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .55rem .75rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer; user-select: none;
+    }
+    #status-panel.sp-mini .sp-header { border-bottom: none; }
+    .sp-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+      background: var(--text-muted);
+      transition: background .3s;
+    }
+    .sp-dot.active { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+    .sp-title { flex: 1; font-weight: 600; color: var(--text-muted); font-size: .78rem; letter-spacing: .03em; }
+    .sp-mini-btn {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: .9rem; padding: 0 .15rem; line-height: 1;
+    }
+    .sp-mini-btn:hover { color: var(--accent); }
+    .sp-body { padding: .6rem .75rem; display: flex; flex-direction: column; gap: .65rem; }
+    .sp-task { display: flex; flex-direction: column; gap: .3rem; }
+    .sp-task-title {
+      font-weight: 600; font-size: .75rem;
+      color: var(--accent); text-transform: uppercase; letter-spacing: .06em;
+    }
+    .sp-bar-wrap {
+      height: 5px; background: var(--border); border-radius: 3px; overflow: hidden;
+    }
+    .sp-bar-fill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent), #79c0ff);
+      transition: width .4s ease;
+    }
+    .sp-current {
+      color: var(--text-muted); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .sp-current strong { color: #cdd9e5; }
+    .sp-recent { display: flex; flex-direction: column; gap: .15rem; }
+    .sp-recent-row {
+      display: flex; align-items: center; gap: .35rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sp-recent-row .sp-icon-ok   { color: var(--green); font-size: .7rem; }
+    .sp-recent-row .sp-icon-fail { color: var(--red);   font-size: .7rem; }
+    .sp-recent-row span { overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+    .sp-url {
+      color: var(--text-muted); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; font-size: .73rem;
+    }
+    .sp-divider { border: none; border-top: 1px solid var(--border); margin: .1rem 0; }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ─────────────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+  </svg>
+  <span style="font-size:1rem;font-weight:700;color:var(--text)">AceScraper</span>
+  <nav class="nav-links">
+    <a href="/list/native" target="_blank" class="export">↓ M3U Native</a>
+    <a href="/list/proxy"  target="_blank" class="export">↓ M3U Proxy</a>
+    <a href="/epg.xml"     target="_blank" class="export">↓ EPG</a>
+    <a href="/docs"        target="_blank">API Docs</a>
+  </nav>
+</nav>
+
+<!-- ── Tabs ───────────────────────────────────────────────────────────────── -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="channels">Canales</button>
+  <button class="tab-btn" data-tab="sources">Hashes / Fuentes</button>
+  <button class="tab-btn" data-tab="feeds">Feed URLs</button>
+  <button class="tab-btn" data-tab="groups">Grupos</button>
+  <button class="tab-btn" data-tab="config">Configuración</button>
+</div>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────── -->
+<main style="max-width:1280px;margin:0 auto;padding:1.5rem 1.5rem 3rem">
+
+<!-- ════════════════════════════ CHANNELS ════════════════════════════════════ -->
+<section id="tab-channels" class="tab-content active space-y">
+
+  <div class="section-header">
+    <h2 class="section-title">Canales</h2>
+    <button class="btn btn-primary" onclick="openAddChannelModal()">+ Añadir Canal</button>
+  </div>
+
+  <!-- Search -->
+  <div class="card">
+    <div class="card-body" style="padding:.75rem 1rem">
+      <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:.6rem;align-items:end">
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Buscar</label>
+          <input id="ch-search" type="search" placeholder="Nombre o tvg-id…"
+                 oninput="filterChannels()" style="height:36px;padding:.4rem .7rem"/>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Fuente XMLTV</label>
+          <select id="ch-f-xmltv" onchange="filterChannels()" style="height:36px;padding:.35rem .7rem;width:auto">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Hashes</label>
+          <select id="ch-f-hashes" onchange="filterChannels()" style="height:36px;padding:.35rem .7rem;width:auto">
+            <option value="">Todos</option>
+            <option value="with">Con hashes</option>
+            <option value="without">Sin hashes</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Logo</label>
+          <select id="ch-f-logo" onchange="filterChannels()" style="height:36px;padding:.35rem .7rem;width:auto">
+            <option value="">Todos</option>
+            <option value="custom">Logo personalizado</option>
+            <option value="xmltv">Solo XMLTV</option>
+            <option value="any">Con cualquier logo</option>
+            <option value="none">Sin logo</option>
+          </select>
+        </div>
+        <div style="padding-bottom:1px">
+          <button class="btn btn-ghost" onclick="clearChannelFilters()"
+                  style="height:36px" title="Limpiar filtros">✕ Limpiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:52px">Logo</th>
+            <th>Nombre</th>
+            <th>tvg-id</th>
+            <th>Grupos</th>
+            <th style="width:80px;text-align:center">Hashes</th>
+            <th style="width:160px">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="channels-tbody">
+          <tr class="empty-row"><td colspan="6">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════ SOURCES ═════════════════════════════════════ -->
+<section id="tab-sources" class="tab-content space-y">
+
+  <div class="section-header">
+    <h2 class="section-title">Hashes Acestream</h2>
+    <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+      <span id="src-counter" class="badge badge-gray" style="font-size:.75rem"></span>
+      <div id="bulk-bar" style="display:none;align-items:center;gap:.5rem">
+        <span id="bulk-count" style="font-size:.8rem;color:var(--text-muted)"></span>
+        <button class="btn btn-accent btn-sm" onclick="openBulkAssignModal()">Asignar canal</button>
+        <button class="btn btn-danger btn-sm" onclick="bulkDelete()">🗑 Eliminar</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Deseleccionar todo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="card">
+    <div class="card-body" style="padding:.75rem 1rem">
+      <div class="filter-bar">
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Buscar hash / etiqueta</label>
+          <input id="src-f-text" type="search" placeholder="hash o etiqueta…"
+                 oninput="filterSources()" style="height:36px;padding:.4rem .7rem"/>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Canal</label>
+          <select id="src-f-channel" onchange="filterSources()" style="height:36px;padding:.35rem .7rem">
+            <option value="">Todos los canales</option>
+            <option value="__unmapped__">Sin canal asignado</option>
+            <option value="__mapped__">Con canal asignado</option>
+            <option disabled>──────────────</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Estado</label>
+          <select id="src-f-status" onchange="filterSources()" style="height:36px;padding:.35rem .7rem;width:auto">
+            <option value="">Todos</option>
+            <option value="active">Activo</option>
+            <option value="inactive">Inactivo</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Test</label>
+          <select id="src-f-test" onchange="filterSources()" style="height:36px;padding:.35rem .7rem;width:auto">
+            <option value="">Todos</option>
+            <option value="ok">OK</option>
+            <option value="fail">Fallo</option>
+            <option value="untested">Sin probar</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Feed</label>
+          <select id="src-f-feed" onchange="filterSources()" style="height:36px;padding:.35rem .7rem;width:auto">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Grupo</label>
+          <select id="src-f-group" onchange="filterSources()" style="height:36px;padding:.35rem .7rem;width:auto">
+            <option value="">Todos</option>
+            <option value="__withgroup__">Con grupo</option>
+            <option value="__nogroup__">Sin grupo</option>
+            <option disabled>──────────</option>
+          </select>
+        </div>
+        <div style="padding-bottom:1px">
+          <button class="btn btn-ghost" onclick="clearSourceFilters()"
+                  style="height:36px;white-space:nowrap" title="Limpiar filtros">✕ Limpiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import panel -->
+  <div class="card">
+    <div class="card-body">
+      <p class="card-title">Importar hashes</p>
+      <div class="grid-2">
+        <div class="space-s">
+          <label class="field-label">Pegar texto (M3U, lista…)</label>
+          <textarea id="import-text" rows="4" placeholder="Pega aquí contenido con hashes acestream…"></textarea>
+          <button class="btn btn-accent" style="width:100%" onclick="importText()">Extraer hashes</button>
+        </div>
+        <div class="space-s">
+          <label class="field-label">Subir archivo</label>
+          <input id="import-file" type="file" accept=".m3u,.txt,.m3u8"/>
+          <button class="btn btn-accent" style="width:100%;margin-top:.5rem" onclick="importFile()">Subir archivo</button>
+        </div>
+      </div>
+      <p id="import-result" class="success-msg" style="margin-top:.75rem"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px;text-align:center">
+              <input type="checkbox" id="src-select-all" onchange="toggleSelectAll(this.checked)"
+                     title="Seleccionar todos los visibles" style="cursor:pointer"/>
+            </th>
+            <th style="cursor:pointer;user-select:none" onclick="sortSources('ace_hash')">
+              Hash Acestream <span id="sort-ace_hash" style="color:var(--text-dim)">⇅</span>
+            </th>
+            <th style="cursor:pointer;user-select:none" onclick="sortSources('label')">
+              Etiqueta <span id="sort-label" style="color:var(--text-dim)">⇅</span>
+            </th>
+            <th style="cursor:pointer;user-select:none" onclick="sortSources('channel')">
+              Canal vinculado <span id="sort-channel" style="color:var(--text-dim)">⇅</span>
+            </th>
+            <th>Grupos</th>
+            <th style="width:90px">Estado</th>
+            <th style="width:80px">Test</th>
+            <th style="width:90px">Feed</th>
+            <th style="width:150px">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="sources-tbody">
+          <tr class="empty-row"><td colspan="9">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════ FEEDS ═══════════════════════════════════════ -->
+<section id="tab-feeds" class="tab-content space-y">
+
+  <div class="section-header">
+    <h2 class="section-title">Feed URLs</h2>
+    <button class="btn btn-ghost" onclick="refreshAllFeeds()">↺ Actualizar todos</button>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="card-title">Añadir nuevo feed</p>
+      <div class="flex-row">
+        <input id="feed-url" type="url" placeholder="https://ejemplo.com/lista.m3u" style="flex:1"/>
+        <input id="feed-label" type="text" placeholder="Etiqueta (opcional)" style="width:180px"/>
+        <button class="btn btn-primary" onclick="addFeed()">+ Añadir Feed</button>
+      </div>
+      <p id="feed-result" class="success-msg" style="margin-top:.5rem"></p>
+    </div>
+  </div>
+
+  <div id="feeds-list"></div>
+
+  <!-- XMLTV sources -->
+  <div class="section-header" style="margin-top:1.5rem">
+    <h2 class="section-title">Fuentes XMLTV / EPG</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="card-title">Añadir fuente XMLTV</p>
+      <div class="flex-row">
+        <input id="xmltv-new-url" type="url" placeholder="https://ejemplo.com/epg.xml" style="flex:1"/>
+        <input id="xmltv-new-label" type="text" placeholder="Etiqueta (opcional)" style="width:180px"/>
+        <button class="btn btn-accent" onclick="addXmltvUrl()">+ Añadir URL</button>
+      </div>
+      <p id="xmltv-result" class="success-msg" style="margin-top:.5rem"></p>
+    </div>
+  </div>
+
+  <div id="xmltv-list"></div>
+
+</section>
+
+<!-- ════════════════════════════ GROUPS ══════════════════════════════════════ -->
+<section id="tab-groups" class="tab-content space-y">
+  <h2 class="section-title">Grupos</h2>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="card-title">Crear grupo</p>
+      <div class="flex-row">
+        <input id="group-name" type="text" placeholder="Nombre del grupo" style="flex:1"/>
+        <button class="btn btn-primary" onclick="addGroup()">+ Añadir</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:60px">ID</th><th>Nombre</th><th style="width:90px;text-align:center">Canales</th><th style="width:180px">Acciones</th></tr></thead>
+        <tbody id="groups-tbody">
+          <tr class="empty-row"><td colspan="4">Sin grupos creados</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════ CONFIG ══════════════════════════════════════ -->
+<section id="tab-config" class="tab-content space-y">
+  <h2 class="section-title">Configuración</h2>
+
+  <div class="card" style="max-width:520px">
+    <div class="card-body space-y">
+      <p class="card-title">Servidor Acexy</p>
+
+      <div>
+        <label class="field-label">IP del servidor Acexy</label>
+        <input id="cfg-ip" type="text" placeholder="127.0.0.1"/>
+      </div>
+      <div>
+        <label class="field-label">Puerto Acexy</label>
+        <input id="cfg-port" type="number" placeholder="6878"/>
+      </div>
+      <button class="btn btn-primary" onclick="saveConfig()">Guardar configuración</button>
+      <p id="cfg-result" class="success-msg"></p>
+
+      <hr class="divider"/>
+
+      <div>
+        <p class="field-label" style="margin-bottom:.5rem">URL generada para lista Proxy</p>
+        <code>http://&lt;IP&gt;:&lt;Puerto&gt;/ace/getstream?id=&lt;HASH&gt;</code>
+      </div>
+
+      <div style="margin-top:.5rem">
+        <p class="field-label" style="margin-bottom:.5rem">Descargar listas M3U</p>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <a href="/list/native" target="_blank" class="btn btn-accent btn-sm">↓ M3U Native</a>
+          <a href="/list/proxy"  target="_blank" class="btn btn-accent btn-sm">↓ M3U Proxy</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scheduler panel -->
+  <div class="card">
+    <div class="card-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <p class="card-title" style="margin:0">Planificador de actualización de feeds</p>
+        <span id="sched-status-badge" class="badge badge-gray">Cargando…</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
+        <!-- Enable toggle -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Estado</p>
+          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
+            <div style="position:relative;display:inline-block;width:40px;height:22px">
+              <input type="checkbox" id="sched-enabled" onchange="schedToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="sched-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
+              <span id="sched-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
+            </div>
+            <span id="sched-enabled-label" style="font-size:.9rem;font-weight:500">—</span>
+          </label>
+        </div>
+
+        <!-- Interval -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="sched-interval">Intervalo</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="sched-interval" type="number" min="1" max="10080" style="width:90px"
+                   onchange="schedMarkDirty()"/>
+            <select id="sched-unit" onchange="schedUnitChange()" style="width:auto">
+              <option value="60">horas</option>
+              <option value="1">minutos</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Next run -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Próxima ejecución</p>
+          <p id="sched-next-run" style="font-size:.9rem;font-weight:500">—</p>
+        </div>
+
+        <!-- Last run -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Última ejecución</p>
+          <p id="sched-last-run" style="font-size:.9rem;font-weight:500">—</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <button id="sched-save-btn" class="btn btn-primary" onclick="saveScheduler()" disabled>Guardar cambios</button>
+        <button class="btn btn-ghost" onclick="runNow()" id="sched-run-btn">▶ Ejecutar ahora</button>
+        <p id="sched-msg" class="success-msg" style="margin:0"></p>
+      </div>
+    </div>
+  </div>
+  <!-- Stream test panel -->
+  <div class="card">
+    <div class="card-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <p class="card-title" style="margin:0">Prueba de streams</p>
+        <span id="stest-status-badge" class="badge badge-gray">Cargando…</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
+        <!-- Enable toggle -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Estado</p>
+          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
+            <div style="position:relative;display:inline-block;width:40px;height:22px">
+              <input type="checkbox" id="stest-enabled" onchange="streamTestToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="stest-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
+              <span id="stest-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
+            </div>
+            <span id="stest-enabled-label" style="font-size:.9rem;font-weight:500">—</span>
+          </label>
+        </div>
+
+        <!-- Interval fail/untested -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="stest-interval-fail">Intervalo (fallo / sin probar)</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="stest-interval-fail" type="number" min="1" max="10080" style="width:90px"
+                   onchange="streamTestMarkDirty()"/>
+            <span style="font-size:.8rem;color:var(--text-muted)">min</span>
+          </div>
+        </div>
+
+        <!-- Interval ok -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="stest-interval-ok">Intervalo (OK)</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="stest-interval-ok" type="number" min="1" max="10080" style="width:90px"
+                   onchange="streamTestMarkDirty()"/>
+            <span style="font-size:.8rem;color:var(--text-muted)">min</span>
+          </div>
+        </div>
+
+        <!-- Concurrency -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="stest-concurrency">Streams en paralelo</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="stest-concurrency" type="number" min="1" max="50" style="width:90px"
+                   onchange="streamTestMarkDirty()"/>
+            <span style="font-size:.8rem;color:var(--text-muted)">streams</span>
+          </div>
+        </div>
+
+        <!-- Next run fail -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Próxima (fallo/sin probar)</p>
+          <p id="stest-next-fail" style="font-size:.9rem;font-weight:500">—</p>
+        </div>
+
+        <!-- Next run ok -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Próxima (OK)</p>
+          <p id="stest-next-ok" style="font-size:.9rem;font-weight:500">—</p>
+        </div>
+
+        <!-- Last run -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Última ejecución</p>
+          <p id="stest-last-run" style="font-size:.9rem;font-weight:500">—</p>
+        </div>
+      </div>
+
+      <!-- Restart section -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;margin-bottom:1rem">
+        <p style="font-size:.8rem;font-weight:600;margin:0 0 .75rem">Reinicio de contenedores</p>
+
+        <!-- Toggles row -->
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.75rem">
+          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
+            <div style="position:relative;display:inline-block;width:40px;height:22px">
+              <input type="checkbox" id="stest-restart-enabled" onchange="stestRestartToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="stest-restart-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
+              <span id="stest-restart-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
+            </div>
+            <span style="font-size:.85rem">Antes de la prueba</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
+            <div style="position:relative;display:inline-block;width:40px;height:22px">
+              <input type="checkbox" id="stest-restart-after-enabled" onchange="stestRestartToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="stest-restart-after-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
+              <span id="stest-restart-after-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
+            </div>
+            <span style="font-size:.85rem">Después de la prueba</span>
+          </label>
+        </div>
+
+        <!-- Container list + wait (shown when any toggle is on) -->
+        <div id="stest-restart-body" style="display:none">
+          <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <p style="font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem">Contenedores a reiniciar</p>
+              <div id="stest-containers-list" style="display:flex;flex-direction:column;gap:.3rem;max-height:160px;overflow-y:auto">
+                <p style="font-size:.8rem;color:var(--text-muted)">Cargando…</p>
+              </div>
+            </div>
+            <div style="min-width:140px">
+              <label class="field-label" for="stest-restart-wait">Esperar tras reinicio (antes)</label>
+              <div style="display:flex;gap:.5rem;align-items:center">
+                <input id="stest-restart-wait" type="number" min="0" max="120" style="width:70px" onchange="streamTestMarkDirty()"/>
+                <span style="font-size:.8rem;color:var(--text-muted)">seg</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <button id="stest-save-btn" class="btn btn-primary" onclick="saveStreamTest()" disabled>Guardar cambios</button>
+        <button class="btn btn-ghost" onclick="runStreamTestFail()"    id="stest-run-fail-btn">▶ Probar fallidos</button>
+        <button class="btn btn-ghost" onclick="runStreamTestOk()"      id="stest-run-ok-btn">▶ Probar OK</button>
+        <button class="btn btn-ghost" onclick="runStreamTestUntested()" id="stest-run-untested-btn">▶ Probar no probados</button>
+        <button class="btn btn-ghost" onclick="runStreamTestAll()"      id="stest-run-all-btn">▶ Probar todos</button>
+        <p id="stest-msg" class="success-msg" style="margin:0"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- EPG panel -->
+  <div class="card">
+    <div class="card-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <p class="card-title" style="margin:0">Generación de EPG / XMLTV</p>
+        <span id="epg-status-badge" class="badge badge-gray">Cargando…</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
+        <!-- Enable toggle -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Estado</p>
+          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
+            <div style="position:relative;display:inline-block;width:40px;height:22px">
+              <input type="checkbox" id="epg-enabled" onchange="epgToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="epg-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
+              <span id="epg-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
+            </div>
+            <span id="epg-enabled-label" style="font-size:.9rem;font-weight:500">—</span>
+          </label>
+        </div>
+
+        <!-- Days -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="epg-days">Días de programación</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="epg-days" type="number" min="1" max="30" style="width:90px" onchange="epgMarkDirty()"/>
+            <span style="font-size:.8rem;color:var(--text-muted)">días</span>
+          </div>
+        </div>
+
+        <!-- Interval -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="epg-interval">Intervalo de generación</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="epg-interval" type="number" min="1" max="168" style="width:90px" onchange="epgMarkDirty()"/>
+            <span style="font-size:.8rem;color:var(--text-muted)">horas</span>
+          </div>
+        </div>
+
+        <!-- Next run -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Próxima generación</p>
+          <p id="epg-next-run" style="font-size:.9rem;font-weight:500">—</p>
+        </div>
+
+        <!-- Last generated -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Última generación</p>
+          <p id="epg-last-gen" style="font-size:.9rem;font-weight:500">—</p>
+        </div>
+
+        <!-- Stats -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Estadísticas</p>
+          <p id="epg-stats" style="font-size:.85rem;font-weight:500">—</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <button id="epg-save-btn" class="btn btn-primary" onclick="saveEpg()" disabled>Guardar cambios</button>
+        <button class="btn btn-ghost" onclick="generateEpgNow()" id="epg-gen-btn">▶ Generar ahora</button>
+        <a id="epg-download-link" href="/epg.xml" target="_blank" class="btn btn-accent btn-sm" style="display:none">↓ Descargar EPG</a>
+        <p id="epg-msg" class="success-msg" style="margin:0"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Watchdog panel -->
+  <div class="card">
+    <div class="card-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <p class="card-title" style="margin:0">Watchdog de contenedores</p>
+        <span id="wd-status-badge" class="badge badge-gray">Cargando…</span>
+      </div>
+
+      <!-- Service status row -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-bottom:1.2rem">
+        <div id="wd-svc-acexy" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+            <span style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em">acexy</span>
+            <span id="wd-acexy-badge" class="badge badge-gray">—</span>
+          </div>
+          <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Comprobado: <span id="wd-acexy-check">—</span></p>
+          <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Reiniciado: <span id="wd-acexy-restart">—</span></p>
+          <button class="btn btn-ghost btn-sm" style="margin-top:.5rem;font-size:.75rem" onclick="wdRestart('acexy')">↺ Reiniciar</button>
+        </div>
+        <div id="wd-svc-acestream" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+            <span style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em">acestream</span>
+            <span id="wd-acestream-badge" class="badge badge-gray">—</span>
+          </div>
+          <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Comprobado: <span id="wd-acestream-check">—</span></p>
+          <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Reiniciado: <span id="wd-acestream-restart">—</span></p>
+          <button class="btn btn-ghost btn-sm" style="margin-top:.5rem;font-size:.75rem" onclick="wdRestart('acestream')">↺ Reiniciar</button>
+        </div>
+      </div>
+
+      <!-- Config grid -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
+
+        <!-- Enabled toggle -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Estado</p>
+          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
+            <div style="position:relative;display:inline-block;width:40px;height:22px">
+              <input type="checkbox" id="wd-enabled" onchange="wdToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="wd-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
+              <span id="wd-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
+            </div>
+            <span id="wd-enabled-label" style="font-size:.9rem;font-weight:500">—</span>
+          </label>
+        </div>
+
+        <!-- Auto-restart toggle -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Auto-reinicio</p>
+          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
+            <div style="position:relative;display:inline-block;width:40px;height:22px">
+              <input type="checkbox" id="wd-auto-restart" onchange="wdMarkDirty()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="wd-ar-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
+              <span id="wd-ar-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
+            </div>
+            <span id="wd-ar-label" style="font-size:.9rem;font-weight:500">—</span>
+          </label>
+        </div>
+
+        <!-- Interval -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="wd-interval">Intervalo de comprobación</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="wd-interval" type="number" min="1" max="1440" style="width:90px" onchange="wdMarkDirty()"/>
+            <span style="font-size:.8rem;color:var(--text-muted)">min</span>
+          </div>
+        </div>
+
+        <!-- acexy container name -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="wd-acexy-container">Contenedor acexy</label>
+          <select id="wd-acexy-container" style="width:100%" onchange="wdMarkDirty()">
+            <option value="">Cargando…</option>
+          </select>
+        </div>
+
+        <!-- acestream container name -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="wd-acestream-container">Contenedor acestream</label>
+          <select id="wd-acestream-container" style="width:100%" onchange="wdMarkDirty()">
+            <option value="">Cargando…</option>
+          </select>
+        </div>
+
+        <!-- acexy check URL -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="wd-acexy-url">URL comprobación acexy</label>
+          <input id="wd-acexy-url" type="text" placeholder="(usa IP/Puerto acexy por defecto)" style="width:100%;font-size:.8rem" oninput="wdMarkDirty()"/>
+        </div>
+
+        <!-- acestream check URL -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <label class="field-label" for="wd-acestream-url">URL comprobación acestream</label>
+          <input id="wd-acestream-url" type="text" placeholder="http://host:6878/webui/api/service?method=get_version" style="width:100%;font-size:.8rem" oninput="wdMarkDirty()"/>
+        </div>
+
+      </div>
+
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+        <button id="wd-save-btn" class="btn btn-primary" onclick="saveWatchdog()" disabled>Guardar cambios</button>
+        <button class="btn btn-ghost" onclick="wdCheckNow()" id="wd-check-btn">▶ Comprobar ahora</button>
+        <p id="wd-msg" class="success-msg" style="margin:0"></p>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+</main>
+
+<!-- ════════════════════════════ MODALS ══════════════════════════════════════ -->
+
+<!-- Add Channel -->
+<div id="modal-add-channel" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Añadir Canal</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-channel')">&times;</button>
+    </div>
+    <div class="space-s">
+      <div>
+        <label class="field-label">tvg-id <span style="color:var(--red)">*</span></label>
+        <input id="new-ch-tvgid" type="text" placeholder="ej. sport1.es"/>
+      </div>
+      <div>
+        <label class="field-label">Nombre <span style="color:var(--red)">*</span></label>
+        <input id="new-ch-name" type="text" placeholder="ej. Sport 1 España"/>
+      </div>
+      <div>
+        <label class="field-label">URL del logo</label>
+        <input id="new-ch-logo" type="url" placeholder="https://…/logo.png"/>
+      </div>
+      <div>
+        <label class="field-label">Grupos</label>
+        <div id="new-ch-groups" style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.25rem"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-add-channel')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitAddChannel()">Crear canal</button>
+    </div>
+  </div>
+</div>
+
+<!-- Map Source -->
+<div id="modal-map-source" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Vincular hash a canal</h3>
+      <button class="modal-close" onclick="closeModal('modal-map-source')">&times;</button>
+    </div>
+    <div class="space-s">
+      <div>
+        <label class="field-label">Hash</label>
+        <p id="map-hash-label" class="hash-text" style="padding:.45rem .75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;word-break:break-all"></p>
+      </div>
+      <div>
+        <label class="field-label">Etiqueta del stream</label>
+        <input id="map-label" type="text" placeholder="ej. Sport 1 HD"/>
+      </div>
+      <div>
+        <label class="field-label">Canal</label>
+        <div class="ss-wrap" id="map-channel-wrap"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-map-source')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitMapSource()">Vincular</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Assign Channel -->
+<div id="modal-bulk-assign" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Asignar canal en masa</h3>
+      <button class="modal-close" onclick="closeModal('modal-bulk-assign')">&times;</button>
+    </div>
+    <p id="bulk-assign-desc" style="font-size:.85rem;color:var(--text-muted);margin-bottom:.75rem"></p>
+    <div>
+      <label class="field-label">Canal</label>
+      <div class="ss-wrap" id="bulk-assign-channel-wrap"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-bulk-assign')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitBulkAssign()">Asignar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Channel Groups -->
+<div id="modal-channel-groups" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Grupos de <span id="cg-channel-name" style="color:var(--accent)"></span></h3>
+      <button class="modal-close" onclick="closeModal('modal-channel-groups')">&times;</button>
+    </div>
+    <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.75rem">
+      Marca los grupos a los que pertenece este canal.
+    </p>
+    <div id="cg-checkboxes" style="display:flex;flex-wrap:wrap;gap:.5rem"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-channel-groups')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitChannelGroups()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Group Channels -->
+<div id="modal-group-channels" class="modal-overlay">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-header">
+      <h3>Canales en <span id="gc-group-name" style="color:var(--accent)"></span></h3>
+      <button class="modal-close" onclick="closeModal('modal-group-channels')">&times;</button>
+    </div>
+
+    <!-- Current channels -->
+    <p class="card-title" style="margin-bottom:.5rem">En este grupo</p>
+    <div id="gc-channel-list" class="modal-scroll space-s">
+      <p style="color:var(--text-dim);font-size:.85rem">Sin canales</p>
+    </div>
+
+    <hr class="divider"/>
+
+    <!-- Add channel -->
+    <p class="card-title" style="margin-bottom:.5rem">Añadir canal</p>
+    <div style="display:flex;gap:.5rem">
+      <input id="gc-search" type="search" placeholder="Buscar canal…" oninput="filterGcSearch()" style="flex:1"/>
+    </div>
+    <div id="gc-search-results" class="modal-scroll" style="margin-top:.5rem"></div>
+
+    <div class="modal-footer" style="margin-top:.75rem">
+      <button class="btn btn-ghost" onclick="closeModal('modal-group-channels')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════ SCRIPT ══════════════════════════════════════ -->
+<script>
+let channels = [], sources = [], groups = [], feeds = [];
+let pendingSourceId = null;
+let pendingChannelId = null;   // for modal-channel-groups
+let pendingGroupId   = null;   // for modal-group-channels
+
+// ── SearchableSelect ──────────────────────────────────────────────────────────
+class SearchableSelect {
+  constructor(container, placeholder, onChange) {
+    this._opts     = [];
+    this._val      = '';
+    this._onChange = onChange || null;
+
+    this._input = document.createElement('input');
+    this._input.type         = 'text';
+    this._input.placeholder  = placeholder;
+    this._input.autocomplete = 'off';
+    Object.assign(this._input.style, {
+      background: 'var(--surface2)', border: '1px solid var(--border2)',
+      borderRadius: '6px', padding: '.55rem .75rem', fontSize: '.875rem',
+      color: 'var(--text)', width: '100%', fontFamily: 'inherit',
+      outline: 'none', boxSizing: 'border-box',
+      transition: 'border-color .15s, box-shadow .15s'
+    });
+
+    this._dd = document.createElement('div');
+    this._dd.className     = 'ss-dropdown';
+    this._dd.style.display = 'none';
+
+    container.appendChild(this._input);
+    container.appendChild(this._dd);
+
+    this._input.addEventListener('focus', () => {
+      this._input.style.borderColor = 'var(--accent)';
+      this._input.style.boxShadow   = '0 0 0 3px rgba(88,166,255,.15)';
+      this._input.select();
+      this._render('');
+      this._dd.style.display = 'block';
+    });
+    this._input.addEventListener('blur', () => {
+      this._input.style.borderColor = 'var(--border2)';
+      this._input.style.boxShadow   = 'none';
+      setTimeout(() => {
+        this._dd.style.display = 'none';
+        const opt = this._opts.find(o => o.value === this._val);
+        this._input.value = opt ? opt.label : '';
+      }, 160);
+    });
+    this._input.addEventListener('input', () => {
+      this._render(this._input.value.toLowerCase());
+      this._dd.style.display = 'block';
+    });
+    this._input.addEventListener('keydown', e => {
+      if (e.key === 'Escape') this._input.blur();
+    });
+  }
+
+  setOptions(opts) {
+    this._opts = opts;
+    if (this._val && !opts.find(o => o.value === this._val)) {
+      this._val = '';
+      this._input.value = '';
+    }
+  }
+
+  getValue() { return this._val; }
+
+  setValue(value) {
+    this._val = value || '';
+    const opt = this._opts.find(o => o.value === this._val);
+    this._input.value = opt ? opt.label : '';
+  }
+
+  _render(q) {
+    const matches = q
+      ? this._opts.filter(o => o.label.toLowerCase().includes(q))
+      : this._opts;
+
+    if (!matches.length) {
+      this._dd.innerHTML = '<div class="ss-none">Sin resultados</div>';
+      return;
+    }
+
+    const MAX = 150;
+    this._dd.innerHTML =
+      matches.slice(0, MAX).map(o =>
+        `<div class="ss-opt${o.value === this._val ? ' ss-sel' : ''}"
+          data-v="${esc(o.value)}" data-l="${esc(o.label)}">${esc(o.label)}</div>`
+      ).join('') +
+      (matches.length > MAX ? `<div class="ss-none">… y ${matches.length - MAX} más</div>` : '');
+
+    this._dd.querySelectorAll('.ss-opt').forEach(el => {
+      el.addEventListener('mousedown', e => {
+        e.preventDefault();
+        this._val         = el.dataset.v;
+        this._input.value = el.dataset.l;
+        this._dd.style.display = 'none';
+        if (this._onChange) this._onChange(this._val);
+      });
+    });
+  }
+}
+
+let mapChannelSS;
+let bulkAssignSS;
+
+document.addEventListener('DOMContentLoaded', () => {
+  mapChannelSS = new SearchableSelect(
+    document.getElementById('map-channel-wrap'),
+    '— Sin vincular —',
+    null
+  );
+  bulkAssignSS = new SearchableSelect(
+    document.getElementById('bulk-assign-channel-wrap'),
+    '— Sin vincular —',
+    null
+  );
+  loadAll();
+  document.querySelectorAll('.tab-btn').forEach(btn =>
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab))
+  );
+});
+
+async function loadAll() {
+  await Promise.all([loadChannels(), loadSources(), loadGroups(), loadFeeds(), loadConfig(), loadScheduler(), loadStreamTest(), loadEpg(), loadXmltvSources(), loadWatchdog()]);
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(s => s.classList.toggle('active', s.id === `tab-${name}`));
+  if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); loadWatchdog(); }
+  if (name === 'feeds') loadXmltvSources();
+}
+
+// ── Modals ────────────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body instanceof FormData) {
+    opts.body = body;
+  } else if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(path, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || res.statusText);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ── Channels ──────────────────────────────────────────────────────────────────
+async function loadChannels() {
+  channels = await api('GET', '/api/channels/');
+  renderChannels(channels);
+  renderGroups();
+  rebuildChannelFilter();
+  rebuildXmltvFilter();
+  filterSources();
+}
+
+function _effectiveLogo(ch) {
+  if (ch.custom_logo) return '/static/logos/' + ch.custom_logo;
+  return ch.logo || null;
+}
+
+function renderChannels(list) {
+  const tbody = document.getElementById('channels-tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Sin canales. Importa un XMLTV o crea uno manualmente.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(ch => {
+    const logoSrc = _effectiveLogo(ch);
+    const logoImg = logoSrc
+      ? `<img src="${esc(logoSrc)}" style="width:36px;height:36px;border-radius:4px;object-fit:contain;background:var(--surface2)" onerror="this.src='';this.style.display='none'">`
+      : `<div style="width:36px;height:36px;border-radius:4px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:var(--text-dim)">IMG</div>`;
+    return `
+    <tr>
+      <td style="width:52px">
+        <div onclick="triggerLogoUpload(${ch.id})" title="Subir logo personalizado" style="cursor:pointer;display:inline-block">
+          ${logoImg}
+        </div>
+      </td>
+      <td>
+        <span id="ch-name-${ch.id}" style="font-weight:600;cursor:text;border-bottom:1px dashed var(--border2)"
+              title="Clic para editar nombre" onclick="inlineEditName(${ch.id})">${esc(ch.name)}</span>
+      </td>
+      <td><span class="mono-sm" style="color:var(--text-muted)">${esc(ch.tvg_id)}</span></td>
+      <td>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.3rem">
+          ${ch.groups.map(g => `<span class="group-pill" onclick="openChannelGroupsModal(${ch.id})" title="Editar grupos">${esc(g.name)}</span>`).join('')}
+          <button class="edit-groups-btn" onclick="openChannelGroupsModal(${ch.id})" title="Editar grupos">✎</button>
+        </div>
+      </td>
+      <td style="text-align:center"><span class="badge ${ch.sources.length ? 'badge-green' : 'badge-gray'}">${ch.sources.length}</span></td>
+      <td>
+        <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap">
+          ${ch.custom_logo ? `<button class="btn btn-ghost btn-sm" onclick="deleteChannelLogo(${ch.id})" title="Eliminar logo personalizado (vuelve al XMLTV)">✕ Logo</button>` : ''}
+          <button class="btn btn-danger btn-sm" onclick="deleteChannel(${ch.id})">Eliminar</button>
+        </div>
+      </td>
+    </tr>
+  `}).join('');
+}
+
+function rebuildXmltvFilter() {
+  const sel = document.getElementById('ch-f-xmltv');
+  const current = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  // Collect unique xmltv sources from loaded channels
+  const seen = new Map();
+  channels.forEach(c => (c.xmltv_urls || []).forEach(x => {
+    if (!seen.has(x.id)) seen.set(x.id, x.label || x.url);
+  }));
+  seen.forEach((label, id) => sel.add(new Option(label, String(id))));
+  sel.value = current;
+}
+
+function filterChannels() {
+  const q       = document.getElementById('ch-search').value.toLowerCase();
+  const xmltvId = document.getElementById('ch-f-xmltv').value;
+  const hashes  = document.getElementById('ch-f-hashes').value;
+  const logo    = document.getElementById('ch-f-logo').value;
+  renderChannels(channels.filter(c => {
+    if (q && !c.name.toLowerCase().includes(q) && !c.tvg_id.toLowerCase().includes(q)) return false;
+    if (xmltvId && !(c.xmltv_urls || []).some(x => String(x.id) === xmltvId)) return false;
+    if (hashes === 'with'    && c.sources.length === 0) return false;
+    if (hashes === 'without' && c.sources.length > 0)  return false;
+    if (logo === 'custom' && !c.custom_logo)            return false;
+    if (logo === 'xmltv'  && (c.custom_logo || !c.logo)) return false;
+    if (logo === 'any'    && !c.custom_logo && !c.logo) return false;
+    if (logo === 'none'   && (c.custom_logo || c.logo)) return false;
+    return true;
+  }));
+}
+
+function clearChannelFilters() {
+  document.getElementById('ch-search').value   = '';
+  document.getElementById('ch-f-xmltv').value  = '';
+  document.getElementById('ch-f-hashes').value = '';
+  document.getElementById('ch-f-logo').value   = '';
+  filterChannels();
+}
+
+function openAddChannelModal() {
+  document.getElementById('new-ch-tvgid').value = '';
+  document.getElementById('new-ch-name').value = '';
+  document.getElementById('new-ch-logo').value = '';
+  document.getElementById('new-ch-groups').innerHTML = groups.length
+    ? groups.map(g => `
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;cursor:pointer;padding:.3rem .6rem;background:var(--surface2);border:1px solid var(--border2);border-radius:6px">
+          <input type="checkbox" value="${g.id}"/> ${esc(g.name)}
+        </label>`).join('')
+    : '<span style="font-size:.8rem;color:var(--text-dim)">Sin grupos creados</span>';
+  openModal('modal-add-channel');
+}
+
+async function submitAddChannel() {
+  const tvg_id   = document.getElementById('new-ch-tvgid').value.trim();
+  const name     = document.getElementById('new-ch-name').value.trim();
+  const logo     = document.getElementById('new-ch-logo').value.trim() || null;
+  const group_ids = [...document.querySelectorAll('#new-ch-groups input:checked')].map(i => +i.value);
+  if (!tvg_id || !name) { alert('tvg-id y nombre son obligatorios'); return; }
+  try {
+    await api('POST', '/api/channels/', { tvg_id, name, logo, group_ids });
+    closeModal('modal-add-channel');
+    await loadChannels();
+  } catch(e) { alert(e.message); }
+}
+
+async function deleteChannel(id) {
+  if (!confirm('¿Eliminar este canal y desvincular sus hashes?')) return;
+  await api('DELETE', `/api/channels/${id}`);
+  await loadChannels();
+}
+
+// ── Logo upload ───────────────────────────────────────────────────────────────
+let _logoTargetId = null;
+
+function triggerLogoUpload(channelId) {
+  _logoTargetId = channelId;
+  document.getElementById('logo-file-input').click();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('logo-file-input').addEventListener('change', async function() {
+    if (!_logoTargetId || !this.files[0]) return;
+    const id = _logoTargetId;
+    _logoTargetId = null;
+    const fd = new FormData();
+    fd.append('file', this.files[0]);
+    this.value = '';
+    try {
+      const r = await fetch(`/api/channels/${id}/logo`, { method: 'POST', body: fd });
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Error al subir el logo'); return; }
+      await loadChannels();
+    } catch(e) { alert('Error al subir el logo'); }
+  });
+});
+
+async function deleteChannelLogo(id) {
+  await api('DELETE', `/api/channels/${id}/logo`);
+  await loadChannels();
+}
+
+function inlineEditName(channelId) {
+  const span = document.getElementById('ch-name-' + channelId);
+  if (!span || span.dataset.editing) return;
+  span.dataset.editing = '1';
+
+  const orig = (channels.find(c => c.id === channelId) || {}).name || span.textContent;
+
+  const input = document.createElement('input');
+  input.type  = 'text';
+  input.value = orig;
+  input.style.cssText =
+    'font-weight:600;min-width:140px;max-width:280px;' +
+    'background:var(--surface2);border:1px solid var(--accent);border-radius:4px;' +
+    'padding:.2rem .45rem;font-size:.875rem;color:var(--text);font-family:inherit;outline:none';
+
+  span.style.display = 'none';
+  span.after(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+
+  async function commit() {
+    if (done) return;
+    done = true;
+    const newName = input.value.trim();
+    if (newName && newName !== orig) {
+      try {
+        await api('PATCH', `/api/channels/${channelId}`, { name: newName });
+        await loadChannels();
+      } catch(e) {
+        alert(e.message);
+        restore();
+      }
+    } else {
+      restore();
+    }
+  }
+
+  function restore() {
+    input.remove();
+    span.style.display = '';
+    delete span.dataset.editing;
+  }
+
+  input.addEventListener('blur',    () => setTimeout(commit, 120));
+  input.addEventListener('keydown', e  => {
+    if (e.key === 'Enter')  { input.blur(); }
+    if (e.key === 'Escape') { done = true; restore(); }
+  });
+}
+
+// ── XMLTV sources ─────────────────────────────────────────────────────────────
+let xmltvSources = [];
+
+async function loadXmltvSources() {
+  xmltvSources = await api('GET', '/api/xmltv/');
+  renderXmltvList();
+}
+
+function renderXmltvList() {
+  const container = document.getElementById('xmltv-list');
+  if (!xmltvSources.length) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">Sin fuentes XMLTV guardadas.</p>';
+    return;
+  }
+  container.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:.4rem .6rem;color:var(--text-muted)">URL / Etiqueta</th>
+          <th style="text-align:center;padding:.4rem .6rem;color:var(--text-muted);width:90px">Canales</th>
+          <th style="text-align:left;padding:.4rem .6rem;color:var(--text-muted);width:140px">Última importación</th>
+          <th style="width:130px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${xmltvSources.map(x => `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:.5rem .6rem">
+            <div style="font-weight:500">${x.label || ''}</div>
+            <div style="color:var(--text-muted);font-size:.78rem;word-break:break-all">${x.url}</div>
+          </td>
+          <td style="text-align:center;padding:.5rem .6rem">
+            <span class="badge badge-gray">${x.channel_count}</span>
+          </td>
+          <td style="padding:.5rem .6rem;color:var(--text-muted)">
+            ${x.last_fetched ? new Date(x.last_fetched).toLocaleString('es-ES') : '—'}
+          </td>
+          <td style="padding:.5rem .6rem;text-align:right">
+            <button class="btn btn-accent btn-sm" onclick="refreshXmltvSource(${x.id})">↻ Importar</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteXmltvSource(${x.id})">Eliminar</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function addXmltvUrl() {
+  const url = document.getElementById('xmltv-new-url').value.trim();
+  const label = document.getElementById('xmltv-new-label').value.trim();
+  if (!url) return;
+  try {
+    await api('POST', '/api/xmltv/', { url, label: label || null });
+    document.getElementById('xmltv-new-url').value = '';
+    document.getElementById('xmltv-new-label').value = '';
+    document.getElementById('xmltv-result').textContent = '✓ Fuente guardada.';
+    await loadXmltvSources();
+  } catch(e) { alert(e.message); }
+}
+
+async function refreshXmltvSource(id) {
+  const msgEl = document.getElementById('xmltv-result');
+  msgEl.textContent = 'Importando…';
+  try {
+    const r = await api('POST', `/api/xmltv/${id}/refresh`);
+    msgEl.textContent = `✓ Creados: ${r.created}  Actualizados: ${r.updated}  Total: ${r.total}`;
+    await loadXmltvSources();
+    await loadChannels();
+  } catch(e) { msgEl.textContent = ''; alert(e.message); }
+}
+
+async function deleteXmltvSource(id) {
+  const src = xmltvSources.find(x => x.id === id);
+  const name = src ? (src.label || src.url) : id;
+  if (!confirm(`¿Eliminar fuente XMLTV "${name}"?\n\nSe eliminarán los canales que solo pertenezcan a esta fuente.`)) return;
+  try {
+    const r = await api('DELETE', `/api/xmltv/${id}`);
+    document.getElementById('xmltv-result').textContent =
+      `✓ Fuente eliminada. Canales eliminados: ${r.deleted_channels}`;
+    await loadXmltvSources();
+    await loadChannels();
+  } catch(e) { alert(e.message); }
+}
+
+
+function inlineEditLabel(sourceId) {
+  const span = document.getElementById('src-label-' + sourceId);
+  if (!span || span.dataset.editing) return;
+  span.dataset.editing = '1';
+
+  const orig = (sources.find(s => s.id === sourceId) || {}).label || '';
+
+  const input = document.createElement('input');
+  input.type        = 'text';
+  input.value       = orig;
+  input.placeholder = 'Etiqueta…';
+  input.style.cssText =
+    'min-width:120px;max-width:260px;font-size:.82rem;' +
+    'background:var(--surface2);border:1px solid var(--accent);border-radius:4px;' +
+    'padding:.2rem .45rem;color:var(--text);font-family:inherit;outline:none';
+
+  span.style.display = 'none';
+  span.after(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+
+  async function commit() {
+    if (done) return;
+    done = true;
+    const newLabel = input.value.trim() || null;
+    if (newLabel !== (orig || null)) {
+      try {
+        await api('PATCH', `/api/sources/${sourceId}`, { label: newLabel });
+        await loadSources();
+      } catch(e) {
+        alert(e.message);
+        restore();
+      }
+    } else {
+      restore();
+    }
+  }
+
+  function restore() {
+    input.remove();
+    span.style.display = '';
+    delete span.dataset.editing;
+  }
+
+  input.addEventListener('blur',    () => setTimeout(commit, 120));
+  input.addEventListener('keydown', e  => {
+    if (e.key === 'Enter')  { input.blur(); }
+    if (e.key === 'Escape') { done = true; restore(); }
+  });
+}
+
+// ── Sources ───────────────────────────────────────────────────────────────────
+let srcSort = { col: null, dir: 1 };  // dir: 1=asc, -1=desc
+let selectedSources = new Set();      // ids of selected rows
+
+async function loadSources() {
+  sources = await api('GET', '/api/sources/?limit=5000');
+  // Remove from selection any ids that no longer exist
+  const existing = new Set(sources.map(s => s.id));
+  for (const id of selectedSources) {
+    if (!existing.has(id)) selectedSources.delete(id);
+  }
+  rebuildChannelFilter();
+  rebuildFeedFilter();
+  rebuildGroupFilter();
+  filterSources();
+  updateBulkBar();
+}
+
+function rebuildChannelFilter() {
+  const sel = document.getElementById('src-f-channel');
+  // Keep first 4 fixed options, rebuild the channel list after them
+  while (sel.options.length > 4) sel.remove(4);
+  channels
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(c => {
+      const opt = new Option(c.name, String(c.id));
+      sel.add(opt);
+    });
+}
+
+function rebuildFeedFilter() {
+  const sel = document.getElementById('src-f-feed');
+  while (sel.options.length > 1) sel.remove(1);
+  feeds.forEach(f => {
+    const label = f.label || (f.url.length > 40 ? f.url.slice(0, 40) + '…' : f.url);
+    sel.add(new Option(label, String(f.id)));
+  });
+}
+
+function rebuildGroupFilter() {
+  const sel = document.getElementById('src-f-group');
+  // Keep first 4 fixed options (Todos, Con grupo, Sin grupo, separator), rebuild after
+  while (sel.options.length > 4) sel.remove(4);
+  groups
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(g => sel.add(new Option(g.name, String(g.id))));
+}
+
+function testBadge(s) {
+  const ts = s.test_status || 'untested';
+  const title = s.test_last_run ? `Última prueba: ${new Date(s.test_last_run).toLocaleString('es-ES')}` : 'Sin probar';
+  if (ts === 'ok')       return `<span class="badge badge-green" title="${title}">OK</span>`;
+  if (ts === 'fail')     return `<span class="badge badge-red"   title="${title}">Fallo</span>`;
+  return `<span class="badge badge-gray" title="${title}">—</span>`;
+}
+
+function filterSources() {
+  const text    = document.getElementById('src-f-text').value.trim().toLowerCase();
+  const channel = document.getElementById('src-f-channel').value;
+  const status  = document.getElementById('src-f-status').value;
+  const testF   = document.getElementById('src-f-test').value;
+  const feedId  = document.getElementById('src-f-feed').value;
+  const groupF  = document.getElementById('src-f-group').value;
+
+  let list = sources.filter(s => {
+    if (text) {
+      const inHash  = s.ace_hash.includes(text);
+      const inLabel = (s.label || '').toLowerCase().includes(text);
+      if (!inHash && !inLabel) return false;
+    }
+    if (channel === '__unmapped__' && s.channel_id !== null) return false;
+    if (channel === '__mapped__'   && s.channel_id === null) return false;
+    if (channel && channel !== '__unmapped__' && channel !== '__mapped__') {
+      if (s.channel_id !== +channel) return false;
+    }
+    if (status === 'active'   && !s.active) return false;
+    if (status === 'inactive' &&  s.active) return false;
+    if (testF && (s.test_status || 'untested') !== testF) return false;
+    if (feedId && s.feed_url_id !== +feedId) return false;
+    if (groupF) {
+      const ch = channels.find(c => c.id === s.channel_id);
+      const chGroups = ch?.groups || [];
+      if (groupF === '__withgroup__' && chGroups.length === 0) return false;
+      if (groupF === '__nogroup__'   && chGroups.length > 0)   return false;
+      if (groupF !== '__withgroup__' && groupF !== '__nogroup__') {
+        if (!chGroups.some(g => g.id === +groupF)) return false;
+      }
+    }
+    return true;
+  });
+
+  // Apply current sort
+  if (srcSort.col) {
+    list = [...list].sort((a, b) => {
+      let va, vb;
+      if (srcSort.col === 'ace_hash') { va = a.ace_hash; vb = b.ace_hash; }
+      else if (srcSort.col === 'label') { va = (a.label||'').toLowerCase(); vb = (b.label||'').toLowerCase(); }
+      else if (srcSort.col === 'channel') {
+        va = (channels.find(c => c.id === a.channel_id)?.name || '').toLowerCase();
+        vb = (channels.find(c => c.id === b.channel_id)?.name || '').toLowerCase();
+      }
+      return va < vb ? -srcSort.dir : va > vb ? srcSort.dir : 0;
+    });
+  }
+
+  renderSources(list);
+}
+
+function sortSources(col) {
+  if (srcSort.col === col) {
+    srcSort.dir *= -1;
+  } else {
+    srcSort.col = col;
+    srcSort.dir = 1;
+  }
+  // Update header indicators
+  ['ace_hash', 'label', 'channel'].forEach(c => {
+    const el = document.getElementById('sort-' + c);
+    if (el) el.textContent = c === srcSort.col ? (srcSort.dir === 1 ? '↑' : '↓') : '⇅';
+  });
+  filterSources();
+}
+
+// ── Bulk selection ────────────────────────────────────────────────────────────
+
+function toggleSource(id, checked) {
+  checked ? selectedSources.add(id) : selectedSources.delete(id);
+  const row = document.getElementById('src-row-' + id);
+  if (row) row.classList.toggle('row-selected', checked);
+  updateBulkBar();
+  updateSelectAll();
+}
+
+function toggleSelectAll(checked) {
+  // Operate only on currently visible rows
+  document.querySelectorAll('.src-chk').forEach(chk => {
+    const id = +chk.dataset.id;
+    chk.checked = checked;
+    checked ? selectedSources.add(id) : selectedSources.delete(id);
+    const row = document.getElementById('src-row-' + id);
+    if (row) row.classList.toggle('row-selected', checked);
+  });
+  updateBulkBar();
+}
+
+function updateSelectAll() {
+  const all  = document.querySelectorAll('.src-chk');
+  const chkd = document.querySelectorAll('.src-chk:checked');
+  const el   = document.getElementById('src-select-all');
+  if (!el) return;
+  el.checked       = all.length > 0 && chkd.length === all.length;
+  el.indeterminate = chkd.length > 0 && chkd.length < all.length;
+}
+
+function updateBulkBar() {
+  const bar   = document.getElementById('bulk-bar');
+  const count = document.getElementById('bulk-count');
+  const n     = selectedSources.size;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+  count.textContent = `${n} seleccionado${n !== 1 ? 's' : ''}`;
+}
+
+function clearSelection() {
+  selectedSources.clear();
+  document.querySelectorAll('.src-chk').forEach(c => c.checked = false);
+  document.querySelectorAll('tr.row-selected').forEach(r => r.classList.remove('row-selected'));
+  updateBulkBar();
+  updateSelectAll();
+}
+
+function openBulkAssignModal() {
+  const n = selectedSources.size;
+  document.getElementById('bulk-assign-desc').textContent =
+    `Se asignará el canal seleccionado a ${n} hash${n !== 1 ? 'es' : ''}.`;
+  bulkAssignSS.setOptions([
+    { value: '', label: '— Sin vincular —' },
+    ...channels.map(c => ({ value: String(c.id), label: `${c.name} — ${c.tvg_id}` }))
+  ]);
+  bulkAssignSS.setValue('');
+  openModal('modal-bulk-assign');
+}
+
+async function submitBulkAssign() {
+  const channel_id = bulkAssignSS.getValue() || null;
+  const ids = [...selectedSources];
+  try {
+    await api('PATCH', '/api/sources/bulk-assign', { ids, channel_id: channel_id ? +channel_id : null });
+    closeModal('modal-bulk-assign');
+    selectedSources.clear();
+    updateBulkBar();
+    await Promise.all([loadSources(), loadChannels()]);
+  } catch(e) { alert(e.message); }
+}
+
+async function bulkDelete() {
+  const ids = [...selectedSources];
+  if (!ids.length) return;
+  if (!confirm(`¿Eliminar ${ids.length} hash${ids.length !== 1 ? 'es' : ''}? Esta acción no se puede deshacer.`)) return;
+  try {
+    const r = await api('DELETE', '/api/sources/bulk', ids);
+    selectedSources.clear();
+    updateBulkBar();
+    await loadSources();
+  } catch(e) { alert(e.message); }
+}
+
+function clearSourceFilters() {
+  document.getElementById('src-f-text').value    = '';
+  document.getElementById('src-f-channel').value = '';
+  document.getElementById('src-f-status').value  = '';
+  document.getElementById('src-f-test').value    = '';
+  document.getElementById('src-f-feed').value    = '';
+  document.getElementById('src-f-group').value   = '';
+  srcSort = { col: null, dir: 1 };
+  ['ace_hash', 'label', 'channel'].forEach(c => {
+    const el = document.getElementById('sort-' + c);
+    if (el) el.textContent = '⇅';
+  });
+  filterSources();
+}
+
+function renderSources(list) {
+  const tbody = document.getElementById('sources-tbody');
+
+  // Update counter
+  const counter = document.getElementById('src-counter');
+  const total   = sources.length;
+  const shown   = list.length;
+  counter.textContent = shown === total ? `${total} hashes` : `${shown} / ${total}`;
+  counter.className   = shown < total ? 'badge badge-yellow' : 'badge badge-gray';
+
+  if (!list.length) {
+    const msg = total === 0
+      ? 'Sin hashes. Importa un archivo M3U o una URL.'
+      : 'Sin resultados para los filtros aplicados.';
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${msg}</td></tr>`;
+    updateSelectAll();
+    return;
+  }
+
+  tbody.innerHTML = list.map(s => {
+    const ch   = channels.find(c => c.id === s.channel_id);
+    const feed = feeds.find(f => f.id === s.feed_url_id);
+    const feedLabel = feed
+      ? (feed.label || (feed.url.length > 22 ? feed.url.slice(0, 22) + '…' : feed.url))
+      : null;
+    const chGroups = ch?.groups || [];
+    const groupsHtml = chGroups.length
+      ? chGroups.map(g => `<span class="badge badge-blue" style="font-size:.7rem">${esc(g.name)}</span>`).join(' ')
+      : '<span style="color:var(--text-dim);font-size:.75rem">—</span>';
+    const checked = selectedSources.has(s.id) ? 'checked' : '';
+    return `<tr id="src-row-${s.id}" class="${selectedSources.has(s.id) ? 'row-selected' : ''}">
+      <td style="text-align:center">
+        <input type="checkbox" class="src-chk" data-id="${s.id}" ${checked}
+               onchange="toggleSource(${s.id}, this.checked)" style="cursor:pointer"/>
+      </td>
+      <td><span class="hash-text">${s.ace_hash}</span></td>
+      <td>
+        <span id="src-label-${s.id}" style="font-size:.82rem;color:var(--text-muted);cursor:text;border-bottom:1px dashed var(--border2)"
+              title="Clic para editar etiqueta" onclick="inlineEditLabel(${s.id})">${s.label
+          ? esc(s.label)
+          : '<span style="color:var(--text-dim)">—</span>'}</span>
+      </td>
+      <td>${ch
+        ? `<span class="badge badge-green">${esc(ch.name)}</span>`
+        : `<span class="badge badge-gray">sin vincular</span>`}</td>
+      <td>${groupsHtml}</td>
+      <td>${s.active
+        ? '<span class="badge badge-green">Activo</span>'
+        : '<span class="badge badge-gray">Inactivo</span>'}</td>
+      <td>${testBadge(s)}</td>
+      <td>${feedLabel
+        ? `<span class="badge badge-blue" title="${esc(feed.url)}" style="font-size:.65rem;max-width:90px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap">${esc(feedLabel)}</span>`
+        : '<span style="color:var(--text-dim);font-size:.75rem">—</span>'}</td>
+      <td>
+        <div style="display:flex;gap:.4rem;align-items:center">
+          <button class="btn btn-accent btn-sm" onclick="openMapModal(${s.id}, '${s.ace_hash}')">Vincular</button>
+          <button class="btn btn-ghost btn-sm" id="test-btn-${s.id}" onclick="testSource(${s.id})" title="Probar stream">▶</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})">×</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  updateSelectAll();
+}
+
+function importMsg(r) {
+  let msg = `✓ Encontrados: ${r.total_found}  Nuevos: ${r.new_hashes}  Duplicados: ${r.duplicates}`;
+  if (r.auto_mapped > 0) msg += `  Vinculados automáticamente: ${r.auto_mapped}`;
+  return msg;
+}
+
+async function importText() {
+  const fd = new FormData();
+  fd.append('text', document.getElementById('import-text').value);
+  try {
+    const r = await api('POST', '/api/sources/import/text', fd);
+    document.getElementById('import-result').textContent = importMsg(r);
+    await Promise.all([loadSources(), loadChannels()]);
+  } catch(e) { alert(e.message); }
+}
+
+async function importFile() {
+  const file = document.getElementById('import-file').files[0];
+  if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const r = await api('POST', '/api/sources/import/file', fd);
+    document.getElementById('import-result').textContent = importMsg(r);
+    await Promise.all([loadSources(), loadChannels()]);
+  } catch(e) { alert(e.message); }
+}
+
+async function importUrl() {
+  const fd = new FormData();
+  fd.append('url', document.getElementById('import-url').value.trim());
+  try {
+    const r = await api('POST', '/api/sources/import/url', fd);
+    document.getElementById('import-result').textContent = importMsg(r);
+    await Promise.all([loadSources(), loadChannels()]);
+  } catch(e) { alert(e.message); }
+}
+
+function openMapModal(sourceId, hash) {
+  pendingSourceId = sourceId;
+  document.getElementById('map-hash-label').textContent = hash;
+  document.getElementById('map-label').value = '';
+  mapChannelSS.setOptions([
+    { value: '', label: '— Sin vincular —' },
+    ...channels.map(c => ({ value: String(c.id), label: `${c.name} — ${c.tvg_id}` }))
+  ]);
+  mapChannelSS.setValue('');
+  openModal('modal-map-source');
+}
+
+async function submitMapSource() {
+  const channel_id = mapChannelSS.getValue() || null;
+  const label      = document.getElementById('map-label').value.trim() || null;
+  try {
+    await api('PATCH', `/api/sources/${pendingSourceId}`,
+      { channel_id: channel_id ? +channel_id : null, label });
+    closeModal('modal-map-source');
+    await Promise.all([loadSources(), loadChannels()]);
+  } catch(e) { alert(e.message); }
+}
+
+async function deleteSource(id) {
+  await api('DELETE', `/api/sources/${id}`);
+  await loadSources();
+}
+
+// ── Feeds ─────────────────────────────────────────────────────────────────────
+async function loadFeeds() {
+  feeds = await api('GET', '/api/feeds/');
+  rebuildFeedFilter();
+  renderFeedsList();
+}
+
+function renderFeedsList() {
+  const container = document.getElementById('feeds-list');
+  if (!feeds.length) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:.85rem">Sin feeds configurados.</p>';
+    return;
+  }
+  container.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:.4rem .6rem;color:var(--text-muted)">URL / Etiqueta</th>
+          <th style="text-align:center;padding:.4rem .6rem;color:var(--text-muted);width:120px">Hashes</th>
+          <th style="text-align:left;padding:.4rem .6rem;color:var(--text-muted);width:150px">Última actualización</th>
+          <th style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${feeds.map(f => `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:.5rem .6rem">
+            <div style="font-weight:500">${f.label ? esc(f.label) : '<span style="color:var(--text-muted);font-style:italic;font-weight:400">Sin etiqueta</span>'}</div>
+            <div style="color:var(--text-muted);font-size:.78rem;word-break:break-all">${esc(f.url)}</div>
+          </td>
+          <td style="text-align:center;padding:.5rem .6rem">
+            <span class="badge ${f.last_count ? 'badge-blue' : 'badge-gray'}">${f.last_count}</span>
+          </td>
+          <td style="padding:.5rem .6rem;color:var(--text-muted)">
+            ${f.last_fetched ? new Date(f.last_fetched).toLocaleString('es-ES') : '—'}
+          </td>
+          <td style="padding:.5rem .6rem;text-align:right">
+            <button class="btn btn-accent btn-sm" onclick="refreshFeed(${f.id})" title="Actualizar ahora">↻ Actualizar</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteFeed(${f.id})">Eliminar</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function addFeed() {
+  const url   = document.getElementById('feed-url').value.trim();
+  const label = document.getElementById('feed-label').value.trim() || null;
+  if (!url) return;
+  try {
+    await api('POST', '/api/feeds/', { url, label });
+    document.getElementById('feed-url').value = '';
+    document.getElementById('feed-label').value = '';
+    document.getElementById('feed-result').textContent = '✓ Feed guardado.';
+    await loadFeeds();
+  } catch(e) { alert(e.message); }
+}
+
+async function refreshFeed(id) {
+  try {
+    const r = await api('POST', `/api/feeds/${id}/refresh`);
+    alert(importMsg(r));
+    await Promise.all([loadFeeds(), loadSources(), loadChannels()]);
+  } catch(e) { alert(e.message); }
+}
+
+async function refreshAllFeeds() {
+  await api('POST', '/api/feeds/refresh-all');
+  await Promise.all([loadFeeds(), loadSources()]);
+}
+
+async function deleteFeed(id) {
+  if (!confirm('¿Eliminar este feed?')) return;
+  await api('DELETE', `/api/feeds/${id}`);
+  await loadFeeds();
+}
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+async function loadGroups() {
+  groups = await api('GET', '/api/groups/');
+  renderGroups();
+  rebuildGroupFilter();
+}
+
+function renderGroups() {
+  const tbody = document.getElementById('groups-tbody');
+  if (!groups.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Sin grupos creados</td></tr>';
+    return;
+  }
+  tbody.innerHTML = groups.map(g => {
+    const count = channels.filter(c => c.groups.some(cg => cg.id === g.id)).length;
+    return `<tr>
+      <td style="color:var(--text-dim);font-size:.8rem">${g.id}</td>
+      <td style="font-weight:500">${esc(g.name)}</td>
+      <td style="text-align:center">
+        <span class="badge ${count ? 'badge-blue' : 'badge-gray'}">${count}</span>
+      </td>
+      <td>
+        <div style="display:flex;gap:.35rem;align-items:center">
+          <button class="btn btn-accent btn-sm" onclick="openGroupChannelsModal(${g.id})">Gestionar canales</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteGroup(${g.id})">Eliminar</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function addGroup() {
+  const name = document.getElementById('group-name').value.trim();
+  if (!name) return;
+  try {
+    await api('POST', '/api/groups/', { name });
+    document.getElementById('group-name').value = '';
+    await loadGroups();
+  } catch(e) { alert(e.message); }
+}
+
+async function deleteGroup(id) {
+  if (!confirm('¿Eliminar este grupo?')) return;
+  await api('DELETE', `/api/groups/${id}`);
+  await loadGroups();
+}
+
+// ── Config ────────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  const cfg = await api('GET', '/api/config/');
+  document.getElementById('cfg-ip').value   = cfg.acexy_ip;
+  document.getElementById('cfg-port').value = cfg.acexy_port;
+}
+
+async function saveConfig() {
+  const acexy_ip   = document.getElementById('cfg-ip').value.trim();
+  const acexy_port = +document.getElementById('cfg-port').value;
+  try {
+    await api('PUT', '/api/config/', { acexy_ip, acexy_port });
+    const el = document.getElementById('cfg-result');
+    el.textContent = '✓ Guardado correctamente';
+    setTimeout(() => el.textContent = '', 3000);
+  } catch(e) { alert(e.message); }
+}
+
+// ── Scheduler ─────────────────────────────────────────────────────────────────
+let schedState = null;   // last known status from API
+let schedDirty = false;
+
+async function loadScheduler() {
+  try {
+    schedState = await api('GET', '/api/scheduler/');
+    renderScheduler(schedState);
+  } catch(e) { /* silent */ }
+}
+
+function renderScheduler(s) {
+  // Badge
+  const badge = document.getElementById('sched-status-badge');
+  if (s.running && s.enabled) {
+    badge.textContent = 'Activo'; badge.className = 'badge badge-green';
+  } else {
+    badge.textContent = 'Inactivo'; badge.className = 'badge badge-gray';
+  }
+
+  // Toggle
+  const chk = document.getElementById('sched-enabled');
+  chk.checked = s.enabled;
+  updateToggleUI(s.enabled);
+
+  // Interval — display in hours if divisible, else minutes
+  const unit  = document.getElementById('sched-unit');
+  const input = document.getElementById('sched-interval');
+  if (s.interval_minutes % 60 === 0) {
+    unit.value  = '60';
+    input.value = s.interval_minutes / 60;
+  } else {
+    unit.value  = '1';
+    input.value = s.interval_minutes;
+  }
+
+  // Times
+  document.getElementById('sched-next-run').textContent =
+    s.next_run ? new Date(s.next_run + 'Z').toLocaleString('es-ES') : '—';
+  document.getElementById('sched-last-run').textContent =
+    s.last_run ? new Date(s.last_run + 'Z').toLocaleString('es-ES') : 'Nunca';
+
+  schedDirty = false;
+  document.getElementById('sched-save-btn').disabled = true;
+}
+
+function updateToggleUI(enabled) {
+  const track = document.getElementById('sched-track');
+  const thumb = document.getElementById('sched-thumb');
+  const label = document.getElementById('sched-enabled-label');
+  track.style.background = enabled ? 'var(--green)' : 'var(--border2)';
+  thumb.style.left       = enabled ? '21px' : '3px';
+  label.textContent      = enabled ? 'Activo' : 'Inactivo';
+}
+
+function schedToggle() {
+  updateToggleUI(document.getElementById('sched-enabled').checked);
+  schedMarkDirty();
+}
+
+function schedUnitChange() { schedMarkDirty(); }
+
+function schedMarkDirty() {
+  schedDirty = true;
+  document.getElementById('sched-save-btn').disabled = false;
+}
+
+async function saveScheduler() {
+  const enabled   = document.getElementById('sched-enabled').checked;
+  const unit      = +document.getElementById('sched-unit').value;       // 60 or 1
+  const value     = +document.getElementById('sched-interval').value;
+  const interval_minutes = Math.max(1, Math.round(value * unit));
+  try {
+    schedState = await api('PUT', '/api/scheduler/', { enabled, interval_minutes });
+    renderScheduler(schedState);
+    showSchedMsg('✓ Guardado');
+    await loadFeeds();
+  } catch(e) { alert(e.message); }
+}
+
+async function runNow() {
+  const btn = document.getElementById('sched-run-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Ejecutando…';
+  try {
+    schedState = await api('POST', '/api/scheduler/run-now');
+    renderScheduler(schedState);
+    showSchedMsg('✓ Actualización completada');
+    await Promise.all([loadFeeds(), loadSources(), loadChannels()]);
+  } catch(e) { alert(e.message); }
+  finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Ejecutar ahora';
+  }
+}
+
+function showSchedMsg(msg) {
+  const el = document.getElementById('sched-msg');
+  el.textContent = msg;
+  setTimeout(() => el.textContent = '', 4000);
+}
+
+// ── Channel ↔ Groups modal ────────────────────────────────────────────────────
+
+function openChannelGroupsModal(channelId) {
+  pendingChannelId = channelId;
+  const ch = channels.find(c => c.id === channelId);
+  if (!ch) return;
+  document.getElementById('cg-channel-name').textContent = ch.name;
+  const currentIds = new Set(ch.groups.map(g => g.id));
+  document.getElementById('cg-checkboxes').innerHTML = groups.length
+    ? groups.map(g => `
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;cursor:pointer;
+                       padding:.35rem .65rem;background:var(--surface2);border:1px solid var(--border2);
+                       border-radius:6px;transition:border-color .15s"
+               onmouseenter="this.style.borderColor='var(--accent)'"
+               onmouseleave="this.style.borderColor='var(--border2)'">
+          <input type="checkbox" value="${g.id}" ${currentIds.has(g.id) ? 'checked' : ''}/>
+          ${esc(g.name)}
+        </label>`).join('')
+    : '<span style="font-size:.85rem;color:var(--text-dim)">No hay grupos creados todavía.</span>';
+  openModal('modal-channel-groups');
+}
+
+async function submitChannelGroups() {
+  const group_ids = [...document.querySelectorAll('#cg-checkboxes input:checked')].map(i => +i.value);
+  try {
+    await api('PATCH', `/api/channels/${pendingChannelId}`, { group_ids });
+    closeModal('modal-channel-groups');
+    await loadChannels();
+    renderGroups();
+  } catch(e) { alert(e.message); }
+}
+
+// ── Group ↔ Channels modal ────────────────────────────────────────────────────
+
+function openGroupChannelsModal(groupId) {
+  pendingGroupId = groupId;
+  const g = groups.find(x => x.id === groupId);
+  if (!g) return;
+  document.getElementById('gc-group-name').textContent = g.name;
+  document.getElementById('gc-search').value = '';
+  renderGcCurrentChannels();
+  renderGcSearchResults('');
+  openModal('modal-group-channels');
+}
+
+function renderGcCurrentChannels() {
+  const el = document.getElementById('gc-channel-list');
+  const members = channels.filter(c => c.groups.some(g => g.id === pendingGroupId));
+  if (!members.length) {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:.85rem;padding:.25rem">Sin canales en este grupo.</p>';
+    return;
+  }
+  el.innerHTML = members.map(ch => `
+    <div class="ch-list-item">
+      <span style="font-weight:500">${esc(ch.name)}
+        <span style="font-size:.7rem;color:var(--text-dim);margin-left:.4rem">${esc(ch.tvg_id)}</span>
+      </span>
+      <button class="btn btn-danger btn-sm" onclick="removeChannelFromGroup(${ch.id})">Quitar</button>
+    </div>`).join('');
+}
+
+function filterGcSearch() {
+  renderGcSearchResults(document.getElementById('gc-search').value.trim().toLowerCase());
+}
+
+function renderGcSearchResults(q) {
+  const el = document.getElementById('gc-search-results');
+  const notMembers = channels.filter(c =>
+    !c.groups.some(g => g.id === pendingGroupId) &&
+    (!q || c.name.toLowerCase().includes(q) || c.tvg_id.toLowerCase().includes(q))
+  );
+  if (!notMembers.length) {
+    el.innerHTML = q
+      ? '<p style="color:var(--text-dim);font-size:.85rem;padding:.25rem">Sin resultados.</p>'
+      : '<p style="color:var(--text-dim);font-size:.85rem;padding:.25rem">Todos los canales ya están en este grupo.</p>';
+    return;
+  }
+  el.innerHTML = notMembers.slice(0, 50).map(ch => `
+    <div class="ch-list-item" style="margin-top:.35rem">
+      <span style="font-weight:500">${esc(ch.name)}
+        <span style="font-size:.7rem;color:var(--text-dim);margin-left:.4rem">${esc(ch.tvg_id)}</span>
+      </span>
+      <button class="btn btn-primary btn-sm" onclick="addChannelToGroup(${ch.id})">+ Añadir</button>
+    </div>`).join('');
+}
+
+async function addChannelToGroup(channelId) {
+  const ch = channels.find(c => c.id === channelId);
+  if (!ch) return;
+  const group_ids = [...new Set([...ch.groups.map(g => g.id), pendingGroupId])];
+  try {
+    await api('PATCH', `/api/channels/${channelId}`, { group_ids });
+    await loadChannels();
+    renderGcCurrentChannels();
+    renderGcSearchResults(document.getElementById('gc-search').value.trim().toLowerCase());
+    renderGroups();
+  } catch(e) { alert(e.message); }
+}
+
+async function removeChannelFromGroup(channelId) {
+  const ch = channels.find(c => c.id === channelId);
+  if (!ch) return;
+  const group_ids = ch.groups.map(g => g.id).filter(id => id !== pendingGroupId);
+  try {
+    await api('PATCH', `/api/channels/${channelId}`, { group_ids });
+    await loadChannels();
+    renderGcCurrentChannels();
+    renderGcSearchResults(document.getElementById('gc-search').value.trim().toLowerCase());
+    renderGroups();
+  } catch(e) { alert(e.message); }
+}
+
+// ── Stream Test config ────────────────────────────────────────────────────────
+let stestState = null;
+let stestDirty = false;
+
+async function loadStreamTest() {
+  try {
+    stestState = await api('GET', '/api/stream-test/config');
+    renderStreamTest(stestState);
+    await loadStestContainers(stestState.restart_containers);
+  } catch(e) { /* silent */ }
+}
+
+function renderStreamTest(s) {
+  const badge = document.getElementById('stest-status-badge');
+  badge.textContent = s.enabled ? 'Activo' : 'Inactivo';
+  badge.className   = s.enabled ? 'badge badge-green' : 'badge badge-gray';
+
+  const chk = document.getElementById('stest-enabled');
+  chk.checked = s.enabled;
+  updateStreamTestToggleUI(s.enabled);
+
+  document.getElementById('stest-interval-fail').value = s.interval_fail_minutes;
+  document.getElementById('stest-interval-ok').value   = s.interval_ok_minutes;
+  document.getElementById('stest-concurrency').value   = s.concurrency;
+
+  document.getElementById('stest-next-fail').textContent =
+    s.next_run_fail ? new Date(s.next_run_fail + 'Z').toLocaleString('es-ES') : '—';
+  document.getElementById('stest-next-ok').textContent =
+    s.next_run_ok   ? new Date(s.next_run_ok   + 'Z').toLocaleString('es-ES') : '—';
+  document.getElementById('stest-last-run').textContent =
+    s.last_run      ? new Date(s.last_run       + 'Z').toLocaleString('es-ES') : 'Nunca';
+
+  // Restart toggles
+  const restartBefore = s.restart_before_test;
+  const restartAfter  = s.restart_after_test;
+  document.getElementById('stest-restart-enabled').checked       = restartBefore;
+  document.getElementById('stest-restart-after-enabled').checked = restartAfter;
+  _updateStestRestartToggleUI(restartBefore, 'stest-restart-track', 'stest-restart-thumb');
+  _updateStestRestartToggleUI(restartAfter,  'stest-restart-after-track', 'stest-restart-after-thumb');
+  document.getElementById('stest-restart-body').style.display = (restartBefore || restartAfter) ? 'block' : 'none';
+  document.getElementById('stest-restart-wait').value = s.restart_wait_seconds ?? 15;
+
+  stestDirty = false;
+  document.getElementById('stest-save-btn').disabled = true;
+}
+
+async function loadStestContainers(selectedCsv) {
+  const selected = (selectedCsv || '').split(',').map(s => s.trim()).filter(Boolean);
+  const el = document.getElementById('stest-containers-list');
+  el.innerHTML = '<p style="font-size:.8rem;color:var(--text-muted)">Cargando…</p>';
+  try {
+    const containers = await api('GET', '/api/watchdog/containers');
+    if (!containers.length) {
+      el.innerHTML = '<p style="font-size:.8rem;color:var(--text-muted)">No se pudo conectar con Docker</p>';
+      return;
+    }
+    el.innerHTML = containers.map(c => {
+      const checked = selected.includes(c.name) ? 'checked' : '';
+      const dot = c.status === 'running'
+        ? '<span style="color:var(--green);margin-right:.3rem">●</span>'
+        : '<span style="color:var(--red,#f85149);margin-right:.3rem">●</span>';
+      return `<label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.82rem">
+        <input type="checkbox" class="stest-container-cb" value="${esc(c.name)}" ${checked} onchange="streamTestMarkDirty()"/>
+        ${dot}<span style="font-weight:500">${esc(c.name)}</span>
+        <span style="color:var(--text-muted);font-size:.75rem">${esc(c.image)}</span>
+      </label>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="font-size:.8rem;color:var(--text-muted)">Error al obtener contenedores</p>';
+  }
+}
+
+function _updateStestRestartToggleUI(on, trackId, thumbId) {
+  document.getElementById(trackId).style.background = on ? 'var(--accent)' : 'var(--border2)';
+  document.getElementById(thumbId).style.left = on ? '21px' : '3px';
+}
+
+function stestRestartToggle() {
+  const before = document.getElementById('stest-restart-enabled').checked;
+  const after  = document.getElementById('stest-restart-after-enabled').checked;
+  _updateStestRestartToggleUI(before, 'stest-restart-track', 'stest-restart-thumb');
+  _updateStestRestartToggleUI(after,  'stest-restart-after-track', 'stest-restart-after-thumb');
+  document.getElementById('stest-restart-body').style.display = (before || after) ? 'block' : 'none';
+  streamTestMarkDirty();
+}
+
+function updateStreamTestToggleUI(enabled) {
+  document.getElementById('stest-track').style.background = enabled ? 'var(--green)' : 'var(--border2)';
+  document.getElementById('stest-thumb').style.left       = enabled ? '21px' : '3px';
+  document.getElementById('stest-enabled-label').textContent = enabled ? 'Activo' : 'Inactivo';
+}
+
+function streamTestToggle() {
+  updateStreamTestToggleUI(document.getElementById('stest-enabled').checked);
+  streamTestMarkDirty();
+}
+
+function streamTestMarkDirty() {
+  stestDirty = true;
+  document.getElementById('stest-save-btn').disabled = false;
+}
+
+async function saveStreamTest() {
+  const enabled               = document.getElementById('stest-enabled').checked;
+  const interval_fail_minutes = Math.max(1, +document.getElementById('stest-interval-fail').value);
+  const interval_ok_minutes   = Math.max(1, +document.getElementById('stest-interval-ok').value);
+  const concurrency           = Math.min(50, Math.max(1, +document.getElementById('stest-concurrency').value));
+  const restart_before_test   = document.getElementById('stest-restart-enabled').checked;
+  const restart_after_test    = document.getElementById('stest-restart-after-enabled').checked;
+  const restart_wait_seconds  = Math.max(0, +document.getElementById('stest-restart-wait').value);
+  const restart_containers    = Array.from(document.querySelectorAll('.stest-container-cb:checked'))
+                                     .map(cb => cb.value).join(',');
+  try {
+    stestState = await api('PUT', '/api/stream-test/config', {
+      enabled, interval_fail_minutes, interval_ok_minutes, concurrency,
+      restart_before_test, restart_after_test, restart_containers, restart_wait_seconds,
+    });
+    renderStreamTest(stestState);
+    showStestMsg('✓ Guardado');
+  } catch(e) { alert(e.message); }
+}
+
+const _testBtnIds = ['stest-run-fail-btn', 'stest-run-ok-btn', 'stest-run-untested-btn', 'stest-run-all-btn'];
+let _activeTestBtnId = null;
+
+function _lockTestButtons(activeBtnId) {
+  _testBtnIds.forEach(id => {
+    document.getElementById(id).disabled = (id !== activeBtnId);
+  });
+}
+
+function _unlockTestButtons() {
+  _testBtnIds.forEach(id => { document.getElementById(id).disabled = false; });
+}
+
+async function _cancelStreamTest() {
+  try { await api('POST', '/api/stream-test/cancel'); } catch(e) { /* ignore */ }
+}
+
+function startProgressPolling(btn) {
+  let stopped = false;
+  btn.style.transition = 'background .3s';
+
+  async function poll() {
+    if (stopped) return;
+    try {
+      const p = await fetch('/api/stream-test/progress').then(r => r.json());
+      if (p.total > 0) {
+        const pct = Math.round((p.current / p.total) * 100);
+        btn.style.background =
+          `linear-gradient(to right, #2ea043 ${pct}%, var(--surface2) ${pct}%)`;
+        btn.style.borderColor = '#2ea043';
+        btn.style.color = '#fff';
+        btn.textContent = `Probando ${p.current} / ${p.total} · pulsar para detener`;
+      }
+    } catch(e) { /* ignore */ }
+    if (!stopped) setTimeout(poll, 400);
+  }
+
+  setTimeout(poll, 150);
+
+  return function stop() {
+    stopped = true;
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    btn.style.transition = '';
+  };
+}
+
+async function _runStreamTest(endpoint, btnId, label, msg) {
+  // Si es el botón activo, cancelar
+  if (_activeTestBtnId === btnId) {
+    await _cancelStreamTest();
+    return;
+  }
+  // Si hay otro test en marcha, ignorar (botón deshabilitado, pero por si acaso)
+  if (_activeTestBtnId !== null) return;
+
+  const btn = document.getElementById(btnId);
+  _activeTestBtnId = btnId;
+  _lockTestButtons(btnId);
+  btn.textContent = 'Iniciando…';
+
+  const stopPolling = startProgressPolling(btn);
+  try {
+    stestState = await api('POST', endpoint);
+    renderStreamTest(stestState);
+    showStestMsg(msg);
+    await loadSources();
+  } catch(e) { alert(e.message); }
+  finally {
+    stopPolling();
+    _activeTestBtnId = null;
+    _unlockTestButtons();
+    btn.textContent = label;
+  }
+}
+
+const runStreamTestFail     = () => _runStreamTest('/api/stream-test/run-now/fail',     'stest-run-fail-btn',     '▶ Probar fallidos',     '✓ Prueba completada (fallidos/sin probar)');
+const runStreamTestOk       = () => _runStreamTest('/api/stream-test/run-now/ok',       'stest-run-ok-btn',       '▶ Probar OK',           '✓ Prueba completada (OK)');
+const runStreamTestUntested = () => _runStreamTest('/api/stream-test/run-now/untested', 'stest-run-untested-btn', '▶ Probar no probados',  '✓ Prueba completada (no probados)');
+const runStreamTestAll      = () => _runStreamTest('/api/stream-test/run-now/all',      'stest-run-all-btn',      '▶ Probar todos',        '✓ Prueba completada (todos)');
+
+function showStestMsg(msg) {
+  const el = document.getElementById('stest-msg');
+  el.textContent = msg;
+  setTimeout(() => el.textContent = '', 4000);
+}
+
+// ── EPG ───────────────────────────────────────────────────────────────────────
+let epgState = null;
+
+async function loadEpg() {
+  try {
+    epgState = await api('GET', '/api/epg/config');
+    renderEpg(epgState);
+  } catch(e) {}
+}
+
+function renderEpg(s) {
+  const on = s.enabled;
+  document.getElementById('epg-enabled').checked = on;
+  document.getElementById('epg-track').style.background = on ? 'var(--primary)' : 'var(--border2)';
+  document.getElementById('epg-thumb').style.left = on ? '21px' : '3px';
+  document.getElementById('epg-enabled-label').textContent = on ? 'Activado' : 'Desactivado';
+  document.getElementById('epg-status-badge').textContent  = on ? 'Activo' : 'Inactivo';
+  document.getElementById('epg-status-badge').className    = 'badge ' + (on ? 'badge-green' : 'badge-gray');
+  document.getElementById('epg-days').value     = s.days;
+  document.getElementById('epg-interval').value = s.interval_hours;
+  document.getElementById('epg-next-run').textContent    = s.next_run     ? new Date(s.next_run + 'Z').toLocaleString('es-ES') : '—';
+  document.getElementById('epg-last-gen').textContent    = s.last_generated ? new Date(s.last_generated + 'Z').toLocaleString('es-ES') : '—';
+  document.getElementById('epg-stats').textContent =
+    s.last_generated ? `${s.channel_count} canales · ${s.programme_count.toLocaleString()} programas · ${s.file_size_kb} KB` : '—';
+  const dl = document.getElementById('epg-download-link');
+  dl.style.display = s.last_generated ? 'inline-flex' : 'none';
+  document.getElementById('epg-save-btn').disabled = true;
+}
+
+function epgMarkDirty() {
+  document.getElementById('epg-save-btn').disabled = false;
+}
+
+function epgToggle() {
+  epgMarkDirty();
+  const on = document.getElementById('epg-enabled').checked;
+  document.getElementById('epg-track').style.background = on ? 'var(--primary)' : 'var(--border2)';
+  document.getElementById('epg-thumb').style.left = on ? '21px' : '3px';
+  document.getElementById('epg-enabled-label').textContent = on ? 'Activado' : 'Desactivado';
+}
+
+async function saveEpg() {
+  const enabled       = document.getElementById('epg-enabled').checked;
+  const days          = parseInt(document.getElementById('epg-days').value);
+  const interval_hours = parseInt(document.getElementById('epg-interval').value);
+  epgState = await api('PUT', '/api/epg/config', { enabled, days, interval_hours });
+  renderEpg(epgState);
+  const msg = document.getElementById('epg-msg');
+  msg.textContent = '✓ Guardado';
+  setTimeout(() => msg.textContent = '', 3000);
+}
+
+async function generateEpgNow() {
+  const btn = document.getElementById('epg-gen-btn');
+  btn.textContent = 'Generando…';
+  btn.disabled = true;
+  try {
+    epgState = await api('POST', '/api/epg/generate');
+    renderEpg(epgState);
+    const msg = document.getElementById('epg-msg');
+    msg.textContent = `✓ EPG generado: ${epgState.channel_count} canales, ${epgState.programme_count.toLocaleString()} programas`;
+    setTimeout(() => msg.textContent = '', 5000);
+  } catch(e) { alert(e.message); }
+  finally {
+    btn.textContent = '▶ Generar ahora';
+    btn.disabled = false;
+  }
+}
+
+// ── Watchdog ──────────────────────────────────────────────────────────────────
+let wdDirty = false;
+
+function _fillWdSelect(id, containers, currentVal) {
+  const sel = document.getElementById(id);
+  if (!containers || !containers.length) {
+    sel.innerHTML = `<option value="${esc(currentVal)}">${esc(currentVal || '—')} (Docker no disponible)</option>`;
+    return;
+  }
+  const names = new Set(containers.map(c => c.name));
+  let opts = '';
+  if (currentVal && !names.has(currentVal)) {
+    opts += `<option value="${esc(currentVal)}" selected>${esc(currentVal)} (no encontrado)</option>`;
+  }
+  opts += containers.map(c => {
+    const dot  = c.status === 'running' ? '● ' : '○ ';
+    const sel2 = c.name === currentVal ? ' selected' : '';
+    return `<option value="${esc(c.name)}"${sel2}>${dot}${esc(c.name)}  [${esc(c.status)}]</option>`;
+  }).join('');
+  sel.innerHTML = opts;
+}
+
+async function loadWatchdog() {
+  const [s, containers] = await Promise.all([
+    api('GET', '/api/watchdog/status'),
+    api('GET', '/api/watchdog/containers').catch(() => []),
+  ]);
+  _fillWdSelect('wd-acexy-container',     containers, s.acexy_container);
+  _fillWdSelect('wd-acestream-container', containers, s.acestream_container);
+  renderWatchdog(s);
+}
+
+function _wdStatusBadge(status) {
+  if (status === 'ok')      return '<span class="badge badge-green">OK</span>';
+  if (status === 'fail')    return '<span class="badge badge-red">Caído</span>';
+  return '<span class="badge badge-gray">—</span>';
+}
+
+function _wdFmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('es-ES', {hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'2-digit'});
+}
+
+function renderWatchdog(s) {
+  const on = s.enabled;
+  document.getElementById('wd-status-badge').className = `badge ${on ? 'badge-green' : 'badge-gray'}`;
+  document.getElementById('wd-status-badge').textContent = on ? 'Activo' : 'Inactivo';
+
+  // Toggle state
+  const cbEn = document.getElementById('wd-enabled');
+  cbEn.checked = on;
+  document.getElementById('wd-track').style.background = on ? 'var(--accent)' : 'var(--border2)';
+  document.getElementById('wd-thumb').style.left = on ? '21px' : '3px';
+  document.getElementById('wd-enabled-label').textContent = on ? 'Activado' : 'Desactivado';
+
+  const ar = s.auto_restart;
+  const cbAr = document.getElementById('wd-auto-restart');
+  cbAr.checked = ar;
+  document.getElementById('wd-ar-track').style.background = ar ? 'var(--accent)' : 'var(--border2)';
+  document.getElementById('wd-ar-thumb').style.left = ar ? '21px' : '3px';
+  document.getElementById('wd-ar-label').textContent = ar ? 'Activado' : 'Desactivado';
+
+  document.getElementById('wd-interval').value  = s.interval_minutes;
+  document.getElementById('wd-acexy-url').value = s.acexy_url;
+  document.getElementById('wd-acestream-url').value    = s.acestream_url;
+
+  // Service status cards
+  for (const svc of ['acexy', 'acestream']) {
+    const info = s.services[svc];
+    document.getElementById(`wd-${svc}-badge`).outerHTML =
+      `<span id="wd-${svc}-badge">${_wdStatusBadge(info.status)}</span>`;
+    document.getElementById(`wd-${svc}-check`).textContent   = _wdFmtDate(info.last_check);
+    document.getElementById(`wd-${svc}-restart`).textContent = _wdFmtDate(info.last_restart);
+  }
+
+  wdDirty = false;
+  document.getElementById('wd-save-btn').disabled = true;
+}
+
+function wdMarkDirty() {
+  wdDirty = true;
+  document.getElementById('wd-save-btn').disabled = false;
+}
+
+function wdToggle() {
+  wdMarkDirty();
+  const on = document.getElementById('wd-enabled').checked;
+  document.getElementById('wd-track').style.background = on ? 'var(--accent)' : 'var(--border2)';
+  document.getElementById('wd-thumb').style.left = on ? '21px' : '3px';
+  document.getElementById('wd-enabled-label').textContent = on ? 'Activado' : 'Desactivado';
+}
+
+async function saveWatchdog() {
+  const btn = document.getElementById('wd-save-btn');
+  btn.disabled = true;
+  try {
+    const s = await api('PUT', '/api/watchdog/config', {
+      enabled:              document.getElementById('wd-enabled').checked,
+      auto_restart:         document.getElementById('wd-auto-restart').checked,
+      interval_minutes:     +document.getElementById('wd-interval').value,
+      acexy_container:      document.getElementById('wd-acexy-container').value.trim(),
+      acexy_url:            document.getElementById('wd-acexy-url').value.trim(),
+      acestream_container:  document.getElementById('wd-acestream-container').value.trim(),
+      acestream_url:        document.getElementById('wd-acestream-url').value.trim(),
+    });
+    renderWatchdog(s);
+    const msg = document.getElementById('wd-msg');
+    msg.textContent = '✓ Configuración guardada';
+    setTimeout(() => msg.textContent = '', 3000);
+  } catch(e) { alert(e.message); btn.disabled = false; }
+}
+
+async function wdCheckNow() {
+  const btn = document.getElementById('wd-check-btn');
+  btn.textContent = 'Comprobando…';
+  btn.disabled = true;
+  try {
+    const s = await api('POST', '/api/watchdog/check-now');
+    renderWatchdog(s);
+    const msg = document.getElementById('wd-msg');
+    msg.textContent = '✓ Comprobación completada';
+    setTimeout(() => msg.textContent = '', 3000);
+  } catch(e) { alert(e.message); }
+  finally { btn.textContent = '▶ Comprobar ahora'; btn.disabled = false; }
+}
+
+async function wdRestart(service) {
+  if (!confirm(`¿Reiniciar el contenedor ${service}?`)) return;
+  const msg = document.getElementById('wd-msg');
+  try {
+    const r = await api('POST', `/api/watchdog/restart/${service}`);
+    if (r.restarted) {
+      msg.textContent = `✓ ${service} reiniciado`;
+      await loadWatchdog();
+    } else {
+      msg.textContent = `✗ Error: ${r.error || 'desconocido'}`;
+    }
+    setTimeout(() => msg.textContent = '', 5000);
+  } catch(e) { alert(e.message); }
+}
+
+async function testSource(sourceId) {
+  const btn = document.getElementById('test-btn-' + sourceId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  try {
+    const r = await api('POST', `/api/stream-test/${sourceId}`);
+    const s = sources.find(x => x.id === sourceId);
+    if (s) {
+      s.test_status   = r.status;
+      s.test_last_run = new Date().toISOString();
+    }
+    filterSources();
+  } catch(e) { alert(e.message); }
+  finally {
+    if (btn) { btn.disabled = false; btn.textContent = '▶'; }
+  }
+}
+
+// ── Status panel ──────────────────────────────────────────────────────────────
+
+let _spMini       = false;
+let _spTimer      = null;
+let _spWasRunning = false;
+
+function spToggleMini() {
+  _spMini = !_spMini;
+  const panel = document.getElementById('status-panel');
+  const btn   = document.getElementById('sp-mini-btn');
+  panel.classList.toggle('sp-mini', _spMini);
+  btn.textContent = _spMini ? '+' : '−';
+}
+
+function _spBar(current, total) {
+  const pct = total > 0 ? Math.round(current / total * 100) : 0;
+  return `<div class="sp-bar-wrap"><div class="sp-bar-fill" style="width:${pct}%"></div></div>`;
+}
+
+function _spRenderStreamTest(st) {
+  if (!st.running && !st.recent.length) return '';
+  let html = `<div class="sp-task">`;
+  html += `<div class="sp-task-title">▶ Prueba de streams</div>`;
+  if (st.running) {
+    const pct = st.total > 0 ? Math.round(st.current / st.total * 100) : 0;
+    html += _spBar(st.current, st.total);
+    html += `<div class="sp-current">${st.current}/${st.total} (${pct}%)`;
+    if (st.current_label) {
+      html += ` — <strong>${esc(st.current_label)}</strong>`;
+    }
+    html += `</div>`;
+  }
+  if (st.recent.length) {
+    html += `<div class="sp-recent">`;
+    if (!st.running) html += `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:.1rem">Últimos resultados</div>`;
+    for (const r of st.recent) {
+      const icon = r.status === 'ok'
+        ? '<span class="sp-icon-ok">✔</span>'
+        : '<span class="sp-icon-fail">✘</span>';
+      html += `<div class="sp-recent-row">${icon}<span>${esc(r.label)}</span></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function _spRenderFeeds(f) {
+  if (!f.running) return '';
+  let html = `<div class="sp-task">`;
+  html += `<div class="sp-task-title">▶ Actualizando feeds</div>`;
+  html += _spBar(f.current, f.total);
+  html += `<div class="sp-current">${f.current}/${f.total}`;
+  if (f.current_url) {
+    const short = f.current_url.replace(/^https?:\/\//, '');
+    html += `</div><div class="sp-url">${esc(short)}</div>`;
+  } else {
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+async function spPoll() {
+  try {
+    const s = await api('GET', '/api/status');
+    const anyRunning = s.stream_test.running || s.feeds.running;
+
+    // Auto-expand when a new task starts
+    if (anyRunning && !_spWasRunning) {
+      _spMini = false;
+      document.getElementById('status-panel').classList.remove('sp-mini');
+      document.getElementById('sp-mini-btn').textContent = '−';
+    }
+    _spWasRunning = anyRunning;
+
+    const panel = document.getElementById('status-panel');
+    const dot   = document.getElementById('sp-dot');
+
+    const parts = [
+      _spRenderStreamTest(s.stream_test),
+      _spRenderFeeds(s.feeds),
+    ].filter(Boolean);
+
+    const hasContent = parts.length > 0;
+
+    if (hasContent) {
+      panel.classList.remove('sp-hidden');
+      dot.classList.add('active');
+      document.getElementById('sp-body').innerHTML = parts.join('<hr class="sp-divider">');
+    } else {
+      // Últimos resultados de stream test aunque no esté running
+      const recentHtml = _spRenderStreamTest(s.stream_test);
+      if (recentHtml) {
+        panel.classList.remove('sp-hidden');
+        dot.classList.remove('active');
+        document.getElementById('sp-body').innerHTML = recentHtml;
+      } else {
+        panel.classList.add('sp-hidden');
+        dot.classList.remove('active');
+      }
+    }
+
+    _spTimer = setTimeout(spPoll, anyRunning ? 2000 : 10000);
+  } catch (_) {
+    _spTimer = setTimeout(spPoll, 15000);
+  }
+}
+
+// Arrancar el polling cuando la página carga
+document.addEventListener('DOMContentLoaded', () => setTimeout(spPoll, 1500));
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+<input type="file" id="logo-file-input" accept="image/*" style="display:none">
+
+<!-- ── Status panel ─────────────────────────────────────────────────────── -->
+<div id="status-panel" class="sp-hidden">
+  <div class="sp-header" onclick="spToggleMini()">
+    <div class="sp-dot" id="sp-dot"></div>
+    <span class="sp-title">ESTADO</span>
+    <button class="sp-mini-btn" id="sp-mini-btn" title="Minimizar">−</button>
+  </div>
+  <div class="sp-body" id="sp-body"></div>
+</div>
+
+</body>
+</html>

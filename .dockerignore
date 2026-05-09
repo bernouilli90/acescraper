@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual env
+venv/
+.venv/
+
+# Data (persisted via volume, never bake into image)
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Dev / CI
+.env
+.git/
+.gitignore
+.claude/
+
+# Docs / scripts not needed at runtime
+*.md
+run.sh

@@ -1,0 +1,71 @@
+services:
+
+  acestream:
+    container_name: acestream
+    image: martinbjeldbak/acestream-http-proxy:latest
+    restart: always
+    ports:
+      - "6878:6878"
+    environment:
+      ALLOW_REMOTE_ACCESS: "yes"
+      EXTRA_FLAGS: "--cache-limit-bytes 2000000000 --live-cache-type memory --vod-cache-type memory --state-dir /dev/shm/.ACEStream --set_allow_remote_access true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf 'http://localhost:6878/webui/api/service?method=get_version' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+  acexy:
+    image: ghcr.io/javinator9889/acexy:latest
+    container_name: acexy
+    restart: on-failure
+    depends_on:
+      acestream:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - /dev/disk/by-id/:/dev/disk/by-id/:ro
+    environment:
+      ACEXY_LISTEN_ADDR: ":8080"
+      ACEXY_SCHEME: "http"
+      ACEXY_HOST: "acestream"
+      ACEXY_PORT: "6878"
+      ACEXY_M3U8_STREAM_TIMEOUT: "60s"
+      ACEXY_M3U8: "false"
+      ACEXY_EMPTY_TIMEOUT: "60s"
+      ACEXY_BUFFER_SIZE: 4MB
+      ACEXY_NO_RESPONSE_TIMEOUT: "6s"
+      ALLOW_REMOTE_ACCESS: "yes"
+      EXTRA_FLAGS: "--cache-limit-bytes 2000000000 --live-cache-type memory --vod-cache-type memory --state-dir /dev/shm/.ACEStream --set_allow_remote_access true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO/dev/null http://localhost:8080/ 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  acescraper:
+    build: .
+    container_name: acescraper
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8888}:8000"
+    volumes:
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "988"
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////data/acescraper.db
+      LOGOS_DIR: /data/logos
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      #TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS:-}
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/config/')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
