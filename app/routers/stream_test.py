@@ -121,6 +121,8 @@ async def get_config(request: Request, db: AsyncSession = Depends(get_db)):
         restart_after_test=cfg.get("stream_test_restart_after_enabled", "false") == "true",
         restart_containers=cfg.get("stream_test_restart_containers", ""),
         restart_wait_seconds=int(cfg.get("stream_test_restart_wait_seconds", "15")),
+        auto_deactivate_enabled=cfg.get("stream_test_auto_deactivate_enabled", "false") == "true",
+        auto_deactivate_hours=int(cfg.get("stream_test_auto_deactivate_hours", "48")),
         next_run_fail=_next_run(scheduler, JOB_FAIL),
         next_run_ok=_next_run(scheduler, JOB_OK),
         last_run=last_run,
@@ -133,14 +135,16 @@ async def update_config(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    await crud.set_config(db, "stream_test_enabled",             str(data.enabled).lower())
-    await crud.set_config(db, "stream_test_interval_fail",        str(data.interval_fail_minutes))
-    await crud.set_config(db, "stream_test_interval_ok",          str(data.interval_ok_minutes))
-    await crud.set_config(db, "stream_test_concurrency",          str(data.concurrency))
-    await crud.set_config(db, "stream_test_restart_enabled",       str(data.restart_before_test).lower())
-    await crud.set_config(db, "stream_test_restart_after_enabled", str(data.restart_after_test).lower())
-    await crud.set_config(db, "stream_test_restart_containers",    data.restart_containers)
-    await crud.set_config(db, "stream_test_restart_wait_seconds",  str(data.restart_wait_seconds))
+    await crud.set_config(db, "stream_test_enabled",               str(data.enabled).lower())
+    await crud.set_config(db, "stream_test_interval_fail",          str(data.interval_fail_minutes))
+    await crud.set_config(db, "stream_test_interval_ok",            str(data.interval_ok_minutes))
+    await crud.set_config(db, "stream_test_concurrency",            str(data.concurrency))
+    await crud.set_config(db, "stream_test_restart_enabled",        str(data.restart_before_test).lower())
+    await crud.set_config(db, "stream_test_restart_after_enabled",  str(data.restart_after_test).lower())
+    await crud.set_config(db, "stream_test_restart_containers",     data.restart_containers)
+    await crud.set_config(db, "stream_test_restart_wait_seconds",   str(data.restart_wait_seconds))
+    await crud.set_config(db, "stream_test_auto_deactivate_enabled", str(data.auto_deactivate_enabled).lower())
+    await crud.set_config(db, "stream_test_auto_deactivate_hours",   str(data.auto_deactivate_hours))
     apply_test_config(_get_scheduler(request), data.interval_fail_minutes, data.interval_ok_minutes, data.enabled)
     return await get_config(request, db)
 
@@ -177,6 +181,15 @@ async def run_now_all(request: Request, db: AsyncSession = Depends(get_db)):
     await _restart_before_if_configured()
     from app import scraper as sc
     await sc.run_stream_tests(["untested", "fail", "ok"])
+    await _restart_after_if_configured()
+    return await get_config(request, db)
+
+
+@router.post("/run-now/dead", response_model=schemas.StreamTestStatus)
+async def run_now_dead(request: Request, db: AsyncSession = Depends(get_db)):
+    await _restart_before_if_configured()
+    from app import scraper as sc
+    await sc.run_stream_tests(["dead"])
     await _restart_after_if_configured()
     return await get_config(request, db)
 

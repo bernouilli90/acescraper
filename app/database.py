@@ -32,6 +32,7 @@ async def init_db():
         for sql in [
             "ALTER TABLE sources ADD COLUMN test_status TEXT NOT NULL DEFAULT 'untested'",
             "ALTER TABLE sources ADD COLUMN test_last_run DATETIME",
+            "ALTER TABLE sources ADD COLUMN fail_since DATETIME",
             "ALTER TABLE channels ADD COLUMN custom_logo TEXT",
         ]:
             try:

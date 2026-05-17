@@ -181,12 +181,38 @@ async def delete_source(db: AsyncSession, source_id: int):
 
 async def update_source_test_result(db: AsyncSession, source_id: int, status: str):
     from datetime import datetime, timezone
-    await db.execute(
+    now = datetime.now(timezone.utc)
+    result = await db.execute(select(models.Source).where(models.Source.id == source_id))
+    source = result.scalar_one_or_none()
+    if not source:
+        return
+    prev = source.test_status
+    # a dead stream that still fails stays dead (not downgraded to fail)
+    if status == "fail" and prev == "dead":
+        status = "dead"
+    # track when continuous failure streak started
+    if status in ("fail", "dead") and prev not in ("fail", "dead"):
+        source.fail_since = now
+    elif status == "ok":
+        source.fail_since = None
+    source.test_status = status
+    source.test_last_run = now
+    await db.commit()
+
+
+async def mark_long_failing_sources_dead(db: AsyncSession, threshold_hours: int) -> int:
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=threshold_hours)
+    result = await db.execute(
         update(models.Source)
-        .where(models.Source.id == source_id)
-        .values(test_status=status, test_last_run=datetime.now(timezone.utc))
+        .where(models.Source.active.is_(True))
+        .where(models.Source.test_status == "fail")
+        .where(models.Source.fail_since != None)  # noqa: E711
+        .where(models.Source.fail_since <= cutoff)
+        .values(test_status="dead")
     )
     await db.commit()
+    return result.rowcount
 
 
 async def get_channels_for_export(db: AsyncSession) -> list:

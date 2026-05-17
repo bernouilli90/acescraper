@@ -251,6 +251,7 @@
     .badge-gray   { background: var(--surface2);  color: var(--text-muted); border-color: var(--border2); }
     .badge-red    { background: var(--red-bg);    color: var(--red);     border-color: #6e2020; }
     .badge-yellow { background: var(--yellow-bg); color: var(--yellow);  border-color: #4d4122; }
+    .badge-orange { background: #2d1f0e;          color: #e8892b;        border-color: #5c3a10; }
 
     /* ── Section header ── */
     .section-header {
@@ -620,6 +621,7 @@
             <option value="ok">OK</option>
             <option value="fail">Fallo</option>
             <option value="untested">Sin probar</option>
+            <option value="dead">Muerto</option>
           </select>
         </div>
         <div>
@@ -927,6 +929,25 @@
           <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem">Última ejecución</p>
           <p id="stest-last-run" style="font-size:.9rem;font-weight:500">—</p>
         </div>
+
+        <!-- Auto-mark dead -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
+          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Auto-marcar muertos</p>
+          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;margin-bottom:.6rem">
+            <div style="position:relative;display:inline-block;width:40px;height:22px">
+              <input type="checkbox" id="stest-autodeact-enabled" onchange="streamTestMarkDirty()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="stest-autodeact-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
+              <span id="stest-autodeact-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
+            </div>
+            <span style="font-size:.85rem">Activado</span>
+          </label>
+          <label class="field-label" for="stest-autodeact-hours">Marcar muerto tras</label>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input id="stest-autodeact-hours" type="number" min="1" max="8760" style="width:80px"
+                   onchange="streamTestMarkDirty()"/>
+            <span style="font-size:.8rem;color:var(--text-muted)">horas de fallo</span>
+          </div>
+        </div>
       </div>
 
       <!-- Restart section -->
@@ -979,6 +1000,7 @@
         <button class="btn btn-ghost" onclick="runStreamTestOk()"      id="stest-run-ok-btn">▶ Probar OK</button>
         <button class="btn btn-ghost" onclick="runStreamTestUntested()" id="stest-run-untested-btn">▶ Probar no probados</button>
         <button class="btn btn-ghost" onclick="runStreamTestAll()"      id="stest-run-all-btn">▶ Probar todos</button>
+        <button class="btn btn-ghost" onclick="runStreamTestDead()"     id="stest-run-dead-btn" style="color:var(--yellow)">☠ Probar muertos</button>
         <p id="stest-msg" class="success-msg" style="margin:0"></p>
       </div>
     </div>
@@ -1069,6 +1091,7 @@
           </div>
           <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Comprobado: <span id="wd-acexy-check">—</span></p>
           <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Reiniciado: <span id="wd-acexy-restart">—</span></p>
+          <p id="wd-acexy-streak" style="font-size:.75rem;color:var(--red,#f85149);margin:.2rem 0"></p>
           <button class="btn btn-ghost btn-sm" style="margin-top:.5rem;font-size:.75rem" onclick="wdRestart('acexy')">↺ Reiniciar</button>
         </div>
         <div id="wd-svc-acestream" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
@@ -1078,6 +1101,7 @@
           </div>
           <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Comprobado: <span id="wd-acestream-check">—</span></p>
           <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Reiniciado: <span id="wd-acestream-restart">—</span></p>
+          <p id="wd-acestream-streak" style="font-size:.75rem;color:var(--red,#f85149);margin:.2rem 0"></p>
           <button class="btn btn-ghost btn-sm" style="margin-top:.5rem;font-size:.75rem" onclick="wdRestart('acestream')">↺ Reiniciar</button>
         </div>
       </div>
@@ -1134,18 +1158,6 @@
           <select id="wd-acestream-container" style="width:100%" onchange="wdMarkDirty()">
             <option value="">Cargando…</option>
           </select>
-        </div>
-
-        <!-- acexy check URL -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <label class="field-label" for="wd-acexy-url">URL comprobación acexy</label>
-          <input id="wd-acexy-url" type="text" placeholder="(usa IP/Puerto acexy por defecto)" style="width:100%;font-size:.8rem" oninput="wdMarkDirty()"/>
-        </div>
-
-        <!-- acestream check URL -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <label class="field-label" for="wd-acestream-url">URL comprobación acestream</label>
-          <input id="wd-acestream-url" type="text" placeholder="http://host:6878/webui/api/service?method=get_version" style="width:100%;font-size:.8rem" oninput="wdMarkDirty()"/>
         </div>
 
       </div>
@@ -1845,8 +1857,12 @@ function rebuildGroupFilter() {
 function testBadge(s) {
   const ts = s.test_status || 'untested';
   const title = s.test_last_run ? `Última prueba: ${new Date(s.test_last_run).toLocaleString('es-ES')}` : 'Sin probar';
-  if (ts === 'ok')       return `<span class="badge badge-green" title="${title}">OK</span>`;
-  if (ts === 'fail')     return `<span class="badge badge-red"   title="${title}">Fallo</span>`;
+  if (ts === 'ok')       return `<span class="badge badge-green"  title="${title}">OK</span>`;
+  if (ts === 'fail')     return `<span class="badge badge-red"    title="${title}">Fallo</span>`;
+  if (ts === 'dead') {
+    const since = s.fail_since ? ` desde ${new Date(s.fail_since).toLocaleString('es-ES')}` : '';
+    return `<span class="badge badge-orange" title="Muerto${since}">Muerto</span>`;
+  }
   return `<span class="badge badge-gray" title="${title}">—</span>`;
 }
 
@@ -2544,6 +2560,12 @@ function renderStreamTest(s) {
   document.getElementById('stest-restart-body').style.display = (restartBefore || restartAfter) ? 'block' : 'none';
   document.getElementById('stest-restart-wait').value = s.restart_wait_seconds ?? 15;
 
+  const autodeactOn = s.auto_deactivate_enabled;
+  document.getElementById('stest-autodeact-enabled').checked = autodeactOn;
+  document.getElementById('stest-autodeact-track').style.background = autodeactOn ? 'var(--accent)' : 'var(--border2)';
+  document.getElementById('stest-autodeact-thumb').style.left = autodeactOn ? '21px' : '3px';
+  document.getElementById('stest-autodeact-hours').value = s.auto_deactivate_hours ?? 48;
+
   stestDirty = false;
   document.getElementById('stest-save-btn').disabled = true;
 }
@@ -2615,16 +2637,19 @@ async function saveStreamTest() {
   const restart_containers    = Array.from(document.querySelectorAll('.stest-container-cb:checked'))
                                      .map(cb => cb.value).join(',');
   try {
+    const auto_deactivate_enabled = document.getElementById('stest-autodeact-enabled').checked;
+    const auto_deactivate_hours   = Math.max(1, +document.getElementById('stest-autodeact-hours').value);
     stestState = await api('PUT', '/api/stream-test/config', {
       enabled, interval_fail_minutes, interval_ok_minutes, concurrency,
       restart_before_test, restart_after_test, restart_containers, restart_wait_seconds,
+      auto_deactivate_enabled, auto_deactivate_hours,
     });
     renderStreamTest(stestState);
     showStestMsg('✓ Guardado');
   } catch(e) { alert(e.message); }
 }
 
-const _testBtnIds = ['stest-run-fail-btn', 'stest-run-ok-btn', 'stest-run-untested-btn', 'stest-run-all-btn'];
+const _testBtnIds = ['stest-run-fail-btn', 'stest-run-ok-btn', 'stest-run-untested-btn', 'stest-run-all-btn', 'stest-run-dead-btn'];
 let _activeTestBtnId = null;
 
 function _lockTestButtons(activeBtnId) {
@@ -2705,6 +2730,7 @@ const runStreamTestFail     = () => _runStreamTest('/api/stream-test/run-now/fai
 const runStreamTestOk       = () => _runStreamTest('/api/stream-test/run-now/ok',       'stest-run-ok-btn',       '▶ Probar OK',           '✓ Prueba completada (OK)');
 const runStreamTestUntested = () => _runStreamTest('/api/stream-test/run-now/untested', 'stest-run-untested-btn', '▶ Probar no probados',  '✓ Prueba completada (no probados)');
 const runStreamTestAll      = () => _runStreamTest('/api/stream-test/run-now/all',      'stest-run-all-btn',      '▶ Probar todos',        '✓ Prueba completada (todos)');
+const runStreamTestDead     = () => _runStreamTest('/api/stream-test/run-now/dead',     'stest-run-dead-btn',     '☠ Probar muertos',      '✓ Prueba completada (muertos)');
 
 function showStestMsg(msg) {
   const el = document.getElementById('stest-msg');
@@ -2814,8 +2840,12 @@ async function loadWatchdog() {
 }
 
 function _wdStatusBadge(status) {
-  if (status === 'ok')      return '<span class="badge badge-green">OK</span>';
-  if (status === 'fail')    return '<span class="badge badge-red">Caído</span>';
+  if (status === 'ok')         return '<span class="badge badge-green">OK</span>';
+  if (status === 'unhealthy')  return '<span class="badge badge-red">No saludable</span>';
+  if (status === 'stopped')    return '<span class="badge badge-red">Parado</span>';
+  if (status === 'starting')   return '<span class="badge badge-yellow">Iniciando</span>';
+  if (status === 'not_found')  return '<span class="badge badge-gray">No encontrado</span>';
+  if (status === 'error')      return '<span class="badge badge-gray">Error Docker</span>';
   return '<span class="badge badge-gray">—</span>';
 }
 
@@ -2843,9 +2873,7 @@ function renderWatchdog(s) {
   document.getElementById('wd-ar-thumb').style.left = ar ? '21px' : '3px';
   document.getElementById('wd-ar-label').textContent = ar ? 'Activado' : 'Desactivado';
 
-  document.getElementById('wd-interval').value  = s.interval_minutes;
-  document.getElementById('wd-acexy-url').value = s.acexy_url;
-  document.getElementById('wd-acestream-url').value    = s.acestream_url;
+  document.getElementById('wd-interval').value = s.interval_minutes;
 
   // Service status cards
   for (const svc of ['acexy', 'acestream']) {
@@ -2854,6 +2882,8 @@ function renderWatchdog(s) {
       `<span id="wd-${svc}-badge">${_wdStatusBadge(info.status)}</span>`;
     document.getElementById(`wd-${svc}-check`).textContent   = _wdFmtDate(info.last_check);
     document.getElementById(`wd-${svc}-restart`).textContent = _wdFmtDate(info.last_restart);
+    const streakEl = document.getElementById(`wd-${svc}-streak`);
+    if (streakEl) streakEl.textContent = info.failing_streak > 0 ? `Fallos consecutivos: ${info.failing_streak}` : '';
   }
 
   wdDirty = false;
@@ -2882,9 +2912,7 @@ async function saveWatchdog() {
       auto_restart:         document.getElementById('wd-auto-restart').checked,
       interval_minutes:     +document.getElementById('wd-interval').value,
       acexy_container:      document.getElementById('wd-acexy-container').value.trim(),
-      acexy_url:            document.getElementById('wd-acexy-url').value.trim(),
       acestream_container:  document.getElementById('wd-acestream-container').value.trim(),
-      acestream_url:        document.getElementById('wd-acestream-url').value.trim(),
     });
     renderWatchdog(s);
     const msg = document.getElementById('wd-msg');

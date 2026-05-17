@@ -48,6 +48,7 @@ class Source(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     test_status = Column(String(10), nullable=False, default="untested")
     test_last_run = Column(DateTime(timezone=True), nullable=True)
+    fail_since = Column(DateTime(timezone=True), nullable=True)
 
     channel = relationship("Channel", back_populates="sources")
     feed_url = relationship("FeedUrl", back_populates="sources")

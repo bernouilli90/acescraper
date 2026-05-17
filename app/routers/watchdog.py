@@ -3,18 +3,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apscheduler.triggers.interval import IntervalTrigger
 from app.database import get_db
 from app import crud, schemas
-from app.docker_utils import docker_restart, docker_list_containers
+from app.docker_utils import docker_restart, docker_list_containers, docker_inspect_container
 from datetime import datetime, timezone
-import httpx
 
 router = APIRouter(prefix="/api/watchdog", tags=["watchdog"])
 
 JOB_ID = "watchdog_check"
 
 _state: dict = {
-    "acexy":      {"status": "unknown", "last_check": None, "last_restart": None},
-    "acestream":  {"status": "unknown", "last_check": None, "last_restart": None},
+    "acexy":     {"status": "unknown", "container_status": None, "health": None, "failing_streak": 0, "last_check": None, "last_restart": None},
+    "acestream": {"status": "unknown", "container_status": None, "health": None, "failing_streak": 0, "last_check": None, "last_restart": None},
 }
+
+
+def _derive_status(info: dict) -> str:
+    """Map Docker inspect result to a single display status."""
+    cs = info.get("container_status")
+    if cs == "not_found":
+        return "not_found"
+    if cs == "error":
+        return "error"
+    if not info.get("running"):
+        return "stopped"
+    health = info.get("health")
+    if health == "unhealthy":
+        return "unhealthy"
+    if health == "starting":
+        return "starting"
+    return "ok"  # running + healthy or no healthcheck
 
 
 def _get_scheduler(request: Request):
@@ -23,15 +39,6 @@ def _get_scheduler(request: Request):
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-async def _check_url(url: str) -> bool:
-    try:
-        async with httpx.AsyncClient() as client:
-            r = await client.get(url, timeout=5.0, follow_redirects=True)
-            return r.status_code < 500
-    except Exception:
-        return False
 
 
 async def _run_check(db=None):
@@ -44,38 +51,27 @@ async def _run_check(db=None):
             return
 
     cfg = await _crud.get_config(db)
-    auto_restart = cfg.get("watchdog_auto_restart", "true") == "true"
-
-    acexy_url = cfg.get("watchdog_acexy_url", "").strip()
-    if not acexy_url:
-        acexy_ip   = cfg.get("acexy_ip", "127.0.0.1")
-        acexy_port = cfg.get("acexy_port", "6878")
-        acexy_url  = f"http://{acexy_ip}:{acexy_port}/"
-
-    acestream_url       = cfg.get("watchdog_acestream_url", "").strip()
+    auto_restart        = cfg.get("watchdog_auto_restart", "true") == "true"
     acexy_container     = cfg.get("watchdog_acexy_container", "acexy")
     acestream_container = cfg.get("watchdog_acestream_container", "acestream")
 
     now = _now_iso()
 
-    acexy_ok = await _check_url(acexy_url)
-    _state["acexy"]["status"]     = "ok" if acexy_ok else "fail"
-    _state["acexy"]["last_check"] = now
-    if not acexy_ok and auto_restart:
-        ok, _ = await docker_restart(acexy_container)
-        if ok:
-            _state["acexy"]["last_restart"] = now
-
-    if acestream_url:
-        acestream_ok = await _check_url(acestream_url)
-        _state["acestream"]["status"]     = "ok" if acestream_ok else "fail"
-        _state["acestream"]["last_check"] = now
-        if not acestream_ok and auto_restart:
-            ok, _ = await docker_restart(acestream_container)
+    for svc, container in [("acexy", acexy_container), ("acestream", acestream_container)]:
+        info = await docker_inspect_container(container)
+        status = _derive_status(info)
+        _state[svc].update({
+            "status":           status,
+            "container_status": info.get("container_status"),
+            "health":           info.get("health"),
+            "failing_streak":   info.get("failing_streak", 0),
+            "last_check":       now,
+        })
+        should_restart = status in ("stopped", "unhealthy")
+        if should_restart and auto_restart:
+            ok, _ = await docker_restart(container)
             if ok:
-                _state["acestream"]["last_restart"] = now
-    else:
-        _state["acestream"]["status"] = "unknown"
+                _state[svc]["last_restart"] = now
 
 
 def apply_watchdog_config(scheduler, interval_minutes: int, enabled: bool):
@@ -103,9 +99,7 @@ async def get_status(db: AsyncSession = Depends(get_db)):
         "auto_restart":         cfg.get("watchdog_auto_restart", "true") == "true",
         "interval_minutes":     int(cfg.get("watchdog_interval_minutes", "5")),
         "acexy_container":      cfg.get("watchdog_acexy_container", "acexy"),
-        "acexy_url":            cfg.get("watchdog_acexy_url", ""),
         "acestream_container":  cfg.get("watchdog_acestream_container", "acestream"),
-        "acestream_url":        cfg.get("watchdog_acestream_url", ""),
         "services":             _state,
     }
 
@@ -116,9 +110,7 @@ async def update_config(data: schemas.WatchdogConfig, request: Request, db: Asyn
     await crud.set_config(db, "watchdog_interval_minutes",    str(data.interval_minutes))
     await crud.set_config(db, "watchdog_auto_restart",        str(data.auto_restart).lower())
     await crud.set_config(db, "watchdog_acexy_container",     data.acexy_container)
-    await crud.set_config(db, "watchdog_acexy_url",           data.acexy_url)
     await crud.set_config(db, "watchdog_acestream_container", data.acestream_container)
-    await crud.set_config(db, "watchdog_acestream_url",       data.acestream_url)
     apply_watchdog_config(_get_scheduler(request), data.interval_minutes, data.enabled)
     return await get_status(db)
 

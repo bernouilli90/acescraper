@@ -68,6 +68,7 @@ class SourceOut(SourceBase):
     created_at: Optional[datetime] = None
     test_status: str = "untested"
     test_last_run: Optional[datetime] = None
+    fail_since: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 
@@ -171,6 +172,8 @@ class StreamTestConfig(BaseModel):
     restart_after_test: bool = False
     restart_containers: str = ""   # comma-separated container names
     restart_wait_seconds: int = 15
+    auto_deactivate_enabled: bool = False
+    auto_deactivate_hours: int = 48
 
 class StreamTestStatus(StreamTestConfig):
     next_run_fail: Optional[datetime] = None
@@ -188,6 +191,4 @@ class WatchdogConfig(BaseModel):
     interval_minutes: int = 5
     auto_restart: bool = True
     acexy_container: str = "acexy"
-    acexy_url: str = ""
     acestream_container: str = "acestream"
-    acestream_url: str = ""
