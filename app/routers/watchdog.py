@@ -28,9 +28,8 @@ def _derive_status(info: dict) -> str:
     health = info.get("health")
     if health == "unhealthy":
         return "unhealthy"
-    if health == "starting":
-        return "starting"
-    return "ok"  # running + healthy or no healthcheck
+    # "starting" = healthcheck aún acumulando ciclos, el contenedor sí corre
+    return "ok"
 
 
 def _get_scheduler(request: Request):
