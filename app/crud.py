@@ -245,6 +245,26 @@ async def bulk_delete_sources(db: AsyncSession, ids: list[int]) -> int:
 
 # ── Groups ────────────────────────────────────────────────────────────────────
 
+async def get_group_channel_ids_ordered(db: AsyncSession, group_id: int) -> list[int]:
+    result = await db.execute(
+        select(models.channel_group.c.channel_id)
+        .where(models.channel_group.c.group_id == group_id)
+        .order_by(models.channel_group.c.position, models.channel_group.c.channel_id)
+    )
+    return [row[0] for row in result.fetchall()]
+
+
+async def update_group_channel_order(db: AsyncSession, group_id: int, channel_ids: list[int]):
+    for pos, ch_id in enumerate(channel_ids):
+        await db.execute(
+            update(models.channel_group)
+            .where(models.channel_group.c.group_id == group_id)
+            .where(models.channel_group.c.channel_id == ch_id)
+            .values(position=pos)
+        )
+    await db.commit()
+
+
 async def get_groups(db: AsyncSession):
     result = await db.execute(select(models.Group))
     return result.scalars().all()

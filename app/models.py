@@ -9,6 +9,7 @@ channel_group = Table(
     Base.metadata,
     Column("channel_id", Integer, ForeignKey("channels.id", ondelete="CASCADE"), primary_key=True),
     Column("group_id", Integer, ForeignKey("groups.id", ondelete="CASCADE"), primary_key=True),
+    Column("position", Integer, default=0),
 )
 
 # N:M association between channels and xmltv sources

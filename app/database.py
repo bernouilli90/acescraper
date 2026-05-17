@@ -34,6 +34,7 @@ async def init_db():
             "ALTER TABLE sources ADD COLUMN test_last_run DATETIME",
             "ALTER TABLE sources ADD COLUMN fail_since DATETIME",
             "ALTER TABLE channels ADD COLUMN custom_logo TEXT",
+            "ALTER TABLE channel_group ADD COLUMN position INTEGER DEFAULT 0",
         ]:
             try:
                 await conn.execute(text(sql))

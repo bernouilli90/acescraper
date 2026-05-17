@@ -376,6 +376,9 @@
       font-size: .85rem;
     }
     .ch-list-item + .ch-list-item { margin-top: .35rem; }
+    .drag-handle { cursor: grab; color: var(--text-dim); font-size: 1rem; user-select: none; padding: 0 .3rem 0 0; }
+    .ch-list-item.dragging { opacity: .35; }
+    .ch-list-item.drag-over { border-color: var(--accent); background: var(--accent-bg); }
 
     .modal-scroll { max-height: 260px; overflow-y: auto; padding-right: 2px; }
 
@@ -2440,31 +2443,82 @@ async function submitChannelGroups() {
 
 // ── Group ↔ Channels modal ────────────────────────────────────────────────────
 
+let gcCurrentChannels = [];
+let gcDragSrcIdx = null;
+
 function openGroupChannelsModal(groupId) {
   pendingGroupId = groupId;
   const g = groups.find(x => x.id === groupId);
   if (!g) return;
   document.getElementById('gc-group-name').textContent = g.name;
   document.getElementById('gc-search').value = '';
+  gcCurrentChannels = [];
   renderGcCurrentChannels();
   renderGcSearchResults('');
   openModal('modal-group-channels');
+  _loadGcCurrentChannels();
+}
+
+async function _loadGcCurrentChannels() {
+  try {
+    const ids = await api('GET', `/api/groups/${pendingGroupId}/channels`);
+    gcCurrentChannels = ids.map(id => channels.find(c => c.id === id)).filter(Boolean);
+    renderGcCurrentChannels();
+  } catch(e) { /* silent */ }
 }
 
 function renderGcCurrentChannels() {
   const el = document.getElementById('gc-channel-list');
-  const members = channels.filter(c => c.groups.some(g => g.id === pendingGroupId));
-  if (!members.length) {
+  if (!gcCurrentChannels.length) {
     el.innerHTML = '<p style="color:var(--text-dim);font-size:.85rem;padding:.25rem">Sin canales en este grupo.</p>';
     return;
   }
-  el.innerHTML = members.map(ch => `
-    <div class="ch-list-item">
-      <span style="font-weight:500">${esc(ch.name)}
-        <span style="font-size:.7rem;color:var(--text-dim);margin-left:.4rem">${esc(ch.tvg_id)}</span>
-      </span>
+  el.innerHTML = gcCurrentChannels.map((ch, i) => `
+    <div class="ch-list-item" draggable="true"
+         ondragstart="gcDragStart(event,${i})" ondragover="gcDragOver(event,${i})"
+         ondrop="gcDrop(event,${i})"          ondragend="gcDragEnd()">
+      <div style="display:flex;align-items:center;gap:.2rem;min-width:0">
+        <span class="drag-handle" title="Arrastrar para reordenar">⠿</span>
+        <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ch.name)}
+          <span style="font-size:.7rem;color:var(--text-dim);margin-left:.4rem">${esc(ch.tvg_id)}</span>
+        </span>
+      </div>
       <button class="btn btn-danger btn-sm" onclick="removeChannelFromGroup(${ch.id})">Quitar</button>
     </div>`).join('');
+}
+
+function gcDragStart(e, idx) {
+  gcDragSrcIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => { const el = e.currentTarget; if (el) el.classList.add('dragging'); }, 0);
+}
+
+function gcDragOver(e, idx) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('#gc-channel-list .ch-list-item').forEach((el, i) => {
+    el.classList.toggle('drag-over', i === idx && i !== gcDragSrcIdx);
+  });
+}
+
+function gcDragEnd() {
+  document.querySelectorAll('#gc-channel-list .ch-list-item').forEach(el =>
+    el.classList.remove('dragging', 'drag-over')
+  );
+}
+
+async function gcDrop(e, targetIdx) {
+  e.preventDefault();
+  gcDragEnd();
+  if (gcDragSrcIdx === null || gcDragSrcIdx === targetIdx) return;
+  const [moved] = gcCurrentChannels.splice(gcDragSrcIdx, 1);
+  gcCurrentChannels.splice(targetIdx, 0, moved);
+  gcDragSrcIdx = null;
+  renderGcCurrentChannels();
+  try {
+    await api('PUT', `/api/groups/${pendingGroupId}/channel-order`,
+      { channel_ids: gcCurrentChannels.map(c => c.id) });
+  } catch(e) { alert(e.message); }
 }
 
 function filterGcSearch() {
@@ -2498,8 +2552,11 @@ async function addChannelToGroup(channelId) {
   const group_ids = [...new Set([...ch.groups.map(g => g.id), pendingGroupId])];
   try {
     await api('PATCH', `/api/channels/${channelId}`, { group_ids });
+    // Persist the new channel at the end of the current order
+    const newOrder = [...gcCurrentChannels.map(c => c.id), channelId];
+    await api('PUT', `/api/groups/${pendingGroupId}/channel-order`, { channel_ids: newOrder });
     await loadChannels();
-    renderGcCurrentChannels();
+    await _loadGcCurrentChannels();
     renderGcSearchResults(document.getElementById('gc-search').value.trim().toLowerCase());
     renderGroups();
   } catch(e) { alert(e.message); }
@@ -2512,7 +2569,7 @@ async function removeChannelFromGroup(channelId) {
   try {
     await api('PATCH', `/api/channels/${channelId}`, { group_ids });
     await loadChannels();
-    renderGcCurrentChannels();
+    await _loadGcCurrentChannels();
     renderGcSearchResults(document.getElementById('gc-search').value.trim().toLowerCase());
     renderGroups();
   } catch(e) { alert(e.message); }

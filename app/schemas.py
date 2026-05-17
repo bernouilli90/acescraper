@@ -123,6 +123,11 @@ class ConfigOut(BaseModel):
     acexy_port: int
 
 
+# --- Group channel order ---
+class GroupChannelOrderUpdate(BaseModel):
+    channel_ids: list[int]
+
+
 # --- Bulk assign ---
 class BulkAssignRequest(BaseModel):
     ids: list[int]
