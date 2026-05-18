@@ -14,7 +14,7 @@ router = APIRouter(tags=["epg"])
 
 JOB_ID = "epg_generate"
 
-EPG_FILE = os.getenv("EPG_FILE", "/data/epg.xml")
+EPG_FILE = os.getenv("EPG_FILE", "./data/epg.xml")
 
 
 def _get_scheduler(request: Request):

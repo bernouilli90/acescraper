@@ -498,6 +498,7 @@
   <button class="tab-btn" data-tab="sources">Hashes / Fuentes</button>
   <button class="tab-btn" data-tab="feeds">Feed URLs</button>
   <button class="tab-btn" data-tab="groups">Grupos</button>
+  <button class="tab-btn" data-tab="export">Listas M3U</button>
   <button class="tab-btn" data-tab="config">Configuración</button>
 </div>
 
@@ -1173,18 +1174,38 @@
     </div>
   </div>
 
-  <!-- Export Profiles -->
+</section>
+
+<!-- ══════════════════════════ EXPORT PROFILES ═══════════════════════════════ -->
+<section id="tab-export" class="tab-content space-y">
+
+  <div class="section-header">
+    <h2 class="section-title">Listas M3U</h2>
+    <button class="btn btn-primary" onclick="openExportProfileModal()">+ Nueva lista</button>
+  </div>
+
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-      <p class="card-title" style="margin:0">Perfiles de exportación M3U</p>
-      <button class="btn btn-accent btn-sm" onclick="openExportProfileModal()">+ Nuevo perfil</button>
+    <div class="card-body" style="padding-bottom:.75rem;border-bottom:1px solid var(--border)">
+      <p style="color:var(--text-muted);font-size:.83rem;margin:0">
+        Cada lista genera una URL M3U independiente con su propio formato de nombre de canal.
+        Compón el nombre usando tokens: <code>{canal}</code> <code>{etiqueta}</code> <code>{etiqueta_o_canal}</code> <code>{hash4}</code> <code>{hash8}</code>.
+      </p>
     </div>
-    <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:.75rem">
-      Cada perfil genera una URL M3U independiente con su propio formato de nombre de canal.
-      Los tokens disponibles son: <code>{canal}</code>, <code>{etiqueta}</code>, <code>{etiqueta_o_canal}</code>, <code>{hash4}</code>, <code>{hash8}</code>.
-    </p>
-    <div id="export-profiles-list">
-      <p style="color:var(--text-dim);font-size:.85rem">Cargando…</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th style="width:90px">Tipo URL</th>
+            <th>Plantilla de nombre</th>
+            <th style="width:200px">URL de descarga</th>
+            <th style="width:140px">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="export-profiles-tbody">
+          <tr class="empty-row"><td colspan="5">Cargando…</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
@@ -1513,7 +1534,8 @@ async function loadAll() {
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-content').forEach(s => s.classList.toggle('active', s.id === `tab-${name}`));
-  if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); loadWatchdog(); loadExportProfiles(); }
+  if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); loadWatchdog(); }
+  if (name === 'export') loadExportProfiles();
   if (name === 'feeds') loadXmltvSources();
 }
 
@@ -3329,25 +3351,32 @@ async function loadExportProfiles() {
 }
 
 function renderExportProfiles() {
-  const el = document.getElementById('export-profiles-list');
+  const tbody = document.getElementById('export-profiles-tbody');
   if (!exportProfiles.length) {
-    el.innerHTML = '<p style="color:var(--text-dim);font-size:.85rem">Sin perfiles. Crea uno con el botón de arriba.</p>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Sin listas. Crea una con el botón de arriba.</td></tr>';
     return;
   }
-  el.innerHTML = exportProfiles.map(p => {
+  tbody.innerHTML = exportProfiles.map(p => {
     const url = `${location.origin}/list/p/${p.id}`;
-    return `<div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:.4rem;flex-wrap:wrap">
-      <span style="font-weight:600;font-size:.85rem;min-width:80px">${esc(p.name)}</span>
-      <span class="badge ${p.url_type === 'proxy' ? 'badge-blue' : 'badge-green'}" style="font-size:.7rem">${p.url_type}</span>
-      <code style="font-size:.75rem;color:var(--text-muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${esc(p.name_template)}</code>
-      <div style="display:flex;gap:.35rem;flex-shrink:0">
-        <button class="btn btn-ghost btn-sm" title="Copiar URL"
-                onclick="navigator.clipboard.writeText('${url}').then(()=>this.textContent='✓').catch(()=>{});setTimeout(()=>this.textContent='📋',1500)">📋</button>
-        <a href="${url}" target="_blank" class="btn btn-ghost btn-sm" title="Descargar M3U">↓ M3U</a>
-        <button class="btn btn-accent btn-sm" onclick="openExportProfileModal(${p.id})">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteExportProfile(${p.id})">×</button>
-      </div>
-    </div>`;
+    return `<tr>
+      <td style="font-weight:600">${esc(p.name)}</td>
+      <td><span class="badge ${p.url_type === 'proxy' ? 'badge-blue' : 'badge-green'}">${p.url_type}</span></td>
+      <td><code style="font-size:.78rem;color:var(--text-muted)">${esc(p.name_template)}</code></td>
+      <td>
+        <div style="display:flex;gap:.3rem;align-items:center">
+          <code style="font-size:.7rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px" title="${esc(url)}">/list/p/${p.id}</code>
+          <button class="btn btn-ghost btn-sm" title="Copiar URL"
+                  onclick="navigator.clipboard.writeText('${url}').then(()=>this.textContent='✓').catch(()=>{});setTimeout(()=>this.textContent='⎘',1200)">⎘</button>
+        </div>
+      </td>
+      <td style="white-space:nowrap">
+        <div style="display:flex;gap:.35rem">
+          <a href="${url}" target="_blank" class="btn btn-ghost btn-sm">↓ M3U</a>
+          <button class="btn btn-accent btn-sm" onclick="openExportProfileModal(${p.id})">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteExportProfile(${p.id})">×</button>
+        </div>
+      </td>
+    </tr>`;
   }).join('');
 }
 
