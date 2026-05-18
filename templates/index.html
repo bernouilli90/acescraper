@@ -6,6 +6,7 @@
   <title>AceScraper</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -673,7 +674,7 @@
 
   <div class="card">
     <div class="tbl-wrap">
-      <table>
+      <table style="min-width:1100px">
         <thead>
           <tr>
             <th style="width:36px;text-align:center">
@@ -693,7 +694,7 @@
             <th style="width:90px">Estado</th>
             <th style="width:80px">Test</th>
             <th style="width:90px">Feed</th>
-            <th style="width:185px">Acciones</th>
+            <th style="min-width:240px">Acciones</th>
           </tr>
         </thead>
         <tbody id="sources-tbody">
@@ -1336,6 +1337,39 @@
 
     <div class="modal-footer" style="margin-top:.75rem">
       <button class="btn btn-ghost" onclick="closeModal('modal-group-channels')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: play stream -->
+<div id="modal-play" class="modal-overlay">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-header">
+      <h3 id="play-label">Reproducir</h3>
+      <button class="modal-close" onclick="closePlayModal()">&times;</button>
+    </div>
+
+    <div style="padding:.75rem 1rem 1rem;display:flex;flex-direction:column;gap:.65rem">
+
+      <!-- Video player -->
+      <div style="background:#000;border-radius:8px;overflow:hidden;position:relative;aspect-ratio:16/9">
+        <video id="play-video" controls playsinline style="width:100%;height:100%;display:block"></video>
+        <div id="play-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:.5rem;background:rgba(0,0,0,.75);pointer-events:none">
+          <span style="font-size:2rem;line-height:1">▶</span>
+          <span id="play-overlay-text" style="font-size:.8rem;opacity:.85">Conectando al stream…</span>
+        </div>
+      </div>
+
+      <!-- Proxy URL copy -->
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <code id="play-proxy-url" style="flex:1;font-size:.68rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem"></code>
+        <button class="btn btn-ghost btn-sm" onclick="copyPlayUrl('play-proxy-url', this)">⎘ Copiar URL</button>
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closePlayModal()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -2188,10 +2222,11 @@ function renderSources(list) {
         ? `<span class="badge badge-blue" title="${esc(feed.url)}" style="font-size:.65rem;max-width:90px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap">${esc(feedLabel)}</span>`
         : '<span style="color:var(--text-dim);font-size:.75rem">—</span>'}</td>
       <td style="white-space:nowrap">
-        <div style="display:flex;gap:.4rem;align-items:center">
+        <div style="display:inline-flex;gap:.4rem;align-items:center">
           <button class="btn btn-accent btn-sm" onclick="openMapModal(${s.id}, '${s.ace_hash}')">Vincular</button>
-          <button class="btn btn-ghost btn-sm" id="test-btn-${s.id}" onclick="testSource(${s.id})" title="Probar stream">⊙</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})">×</button>
+          <button class="btn btn-ghost btn-sm" id="test-btn-${s.id}" onclick="testSource(${s.id})">Test</button>
+          <button class="btn btn-ghost btn-sm" onclick="openPlayModal(${s.id}, '${s.ace_hash}')">Play</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})" title="Eliminar">×</button>
         </div>
       </td>
     </tr>`;
@@ -2390,10 +2425,13 @@ async function deleteGroup(id) {
 }
 
 // ── Config ────────────────────────────────────────────────────────────────────
+let acexyConfig = { port: 8080 };
+
 async function loadConfig() {
   const cfg = await api('GET', '/api/config/');
   document.getElementById('cfg-ip').value   = cfg.acexy_ip;
   document.getElementById('cfg-port').value = cfg.acexy_port;
+  acexyConfig = { port: +cfg.acexy_port };
 }
 
 async function saveConfig() {
@@ -3120,7 +3158,7 @@ async function testSource(sourceId) {
     filterSources();
   } catch(e) { alert(e.message); }
   finally {
-    if (btn) { btn.disabled = false; btn.textContent = '⊙'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Test'; }
   }
 }
 
@@ -3241,6 +3279,73 @@ function esc(str) {
   return String(str ?? '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Playback ─────────────────────────────────────────────────────────────────
+
+function _buildProxyUrl(hash) {
+  return `http://${window.location.hostname}:${acexyConfig.port}/ace/getstream?id=${hash}`;
+}
+
+let _mpegtsPlayer = null;
+
+function openPlayModal(sourceId, hash) {
+  const s     = sources.find(x => x.id === sourceId);
+  const ch    = s && channels.find(c => c.id === s.channel_id);
+  const label = (s && s.label) || (ch && ch.name) || hash.slice(0, 12) + '…';
+
+  document.getElementById('play-label').textContent = label;
+  document.getElementById('play-proxy-url').textContent = _buildProxyUrl(hash);
+  document.getElementById('play-overlay-text').textContent = 'Conectando al stream…';
+
+  const overlay = document.getElementById('play-overlay');
+  overlay.style.display = 'flex';
+
+  openModal('modal-play');
+
+  const video = document.getElementById('play-video');
+
+  if (_mpegtsPlayer) { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
+  video.src = '';
+
+  const streamUrl = `/api/stream/${hash}`;
+
+  if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
+    _mpegtsPlayer = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: streamUrl });
+    _mpegtsPlayer.attachMediaElement(video);
+    _mpegtsPlayer.load();
+    _mpegtsPlayer.play();
+
+    video.addEventListener('playing', () => { overlay.style.display = 'none'; }, { once: true });
+
+    _mpegtsPlayer.on(mpegts.Events.ERROR, (_type, detail) => {
+      overlay.style.display = 'flex';
+      document.getElementById('play-overlay-text').textContent =
+        'Error: ' + (detail?.msg || 'no se pudo conectar');
+    });
+  } else {
+    // Safari / fallback: direct src
+    video.src = streamUrl;
+    video.play().catch(() => {});
+    video.addEventListener('playing', () => { overlay.style.display = 'none'; }, { once: true });
+  }
+}
+
+function closePlayModal() {
+  if (_mpegtsPlayer) { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
+  const video = document.getElementById('play-video');
+  video.pause();
+  video.src = '';
+  closeModal('modal-play');
+}
+
+function copyPlayUrl(elementId, btn) {
+  const text = document.getElementById(elementId).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = orig, 1400);
+  }).catch(() => {});
 }
 
 // ── Export Profiles ───────────────────────────────────────────────────────────

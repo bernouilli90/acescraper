@@ -12,6 +12,7 @@ from app.routers import epg as epg_router
 from app.routers import watchdog as watchdog_router
 from app.routers import status as status_router
 from app.routers import export_profiles as export_profiles_router
+from app.routers import stream_proxy as stream_proxy_router
 from app.routers.scheduler import apply_config, _refresh_task, JOB_ID
 from app.routers.stream_test import apply_test_config
 from app.routers.epg import apply_epg_config
@@ -100,6 +101,7 @@ app.include_router(epg_router.router)
 app.include_router(watchdog_router.router)
 app.include_router(status_router.router)
 app.include_router(export_profiles_router.router)
+app.include_router(stream_proxy_router.router)
 
 
 @app.get("/", response_class=HTMLResponse)
