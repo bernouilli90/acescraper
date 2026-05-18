@@ -428,3 +428,42 @@ async def set_config(db: AsyncSession, key: str, value: str):
     else:
         db.add(models.AppConfig(key=key, value=value))
     await db.commit()
+
+
+# ── Export Profiles ───────────────────────────────────────────────────────────
+
+async def list_export_profiles(db: AsyncSession):
+    r = await db.execute(select(models.ExportProfile).order_by(models.ExportProfile.id))
+    return r.scalars().all()
+
+
+async def get_export_profile(db: AsyncSession, profile_id: int):
+    r = await db.execute(select(models.ExportProfile).where(models.ExportProfile.id == profile_id))
+    return r.scalar_one_or_none()
+
+
+async def create_export_profile(db: AsyncSession, data: schemas.ExportProfileIn):
+    obj = models.ExportProfile(**data.model_dump())
+    db.add(obj)
+    await db.commit()
+    await db.refresh(obj)
+    return obj
+
+
+async def update_export_profile(db: AsyncSession, profile_id: int, data: schemas.ExportProfileIn):
+    obj = await get_export_profile(db, profile_id)
+    if not obj:
+        return None
+    for k, v in data.model_dump().items():
+        setattr(obj, k, v)
+    await db.commit()
+    await db.refresh(obj)
+    return obj
+
+
+async def delete_export_profile(db: AsyncSession, profile_id: int):
+    obj = await get_export_profile(db, profile_id)
+    if obj:
+        await db.delete(obj)
+        await db.commit()
+    return obj

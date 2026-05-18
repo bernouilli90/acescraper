@@ -190,6 +190,18 @@ class StreamTestResult(BaseModel):
     status: str  # "ok" | "fail"
 
 
+# --- Export Profile ---
+class ExportProfileIn(BaseModel):
+    name: str
+    url_type: str = "native"
+    name_template: str = "{canal}"
+
+class ExportProfileOut(ExportProfileIn):
+    id: int
+    created_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
 # --- Watchdog ---
 class WatchdogConfig(BaseModel):
     enabled: bool = False

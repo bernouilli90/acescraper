@@ -692,7 +692,7 @@
             <th style="width:90px">Estado</th>
             <th style="width:80px">Test</th>
             <th style="width:90px">Feed</th>
-            <th style="width:150px">Acciones</th>
+            <th style="width:185px">Acciones</th>
           </tr>
         </thead>
         <tbody id="sources-tbody">
@@ -1173,6 +1173,21 @@
     </div>
   </div>
 
+  <!-- Export Profiles -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <p class="card-title" style="margin:0">Perfiles de exportación M3U</p>
+      <button class="btn btn-accent btn-sm" onclick="openExportProfileModal()">+ Nuevo perfil</button>
+    </div>
+    <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:.75rem">
+      Cada perfil genera una URL M3U independiente con su propio formato de nombre de canal.
+      Los tokens disponibles son: <code>{canal}</code>, <code>{etiqueta}</code>, <code>{etiqueta_o_canal}</code>, <code>{hash4}</code>, <code>{hash8}</code>.
+    </p>
+    <div id="export-profiles-list">
+      <p style="color:var(--text-dim);font-size:.85rem">Cargando…</p>
+    </div>
+  </div>
+
 </section>
 
 </main>
@@ -1305,6 +1320,67 @@
   </div>
 </div>
 
+<!-- Modal: export profile -->
+<div id="modal-export-profile" class="modal-overlay">
+  <div class="modal-box" style="max-width:580px">
+    <div class="modal-header">
+      <h3 id="ep-modal-title">Nuevo perfil</h3>
+      <button class="modal-close" onclick="closeModal('modal-export-profile')">&times;</button>
+    </div>
+
+    <div style="padding:1rem;display:flex;flex-direction:column;gap:.85rem">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div>
+          <label class="field-label">Nombre del perfil</label>
+          <input id="ep-name" type="text" placeholder="Mi lista" style="width:100%">
+        </div>
+        <div>
+          <label class="field-label">Tipo de URL</label>
+          <select id="ep-url-type" style="width:100%;height:36px;padding:.35rem .7rem">
+            <option value="native">Native (acestream://…)</option>
+            <option value="proxy">Proxy (http://acexy/…)</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="field-label" style="margin-bottom:.4rem">Nombre de canal — composición</label>
+        <div id="ep-builder" style="display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;min-height:42px;padding:.45rem .6rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px"></div>
+        <div style="margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.35rem;align-items:center">
+          <span style="font-size:.72rem;color:var(--text-muted)">Añadir:</span>
+          <button class="btn btn-ghost btn-sm" onclick="epAddField('canal')">Canal</button>
+          <button class="btn btn-ghost btn-sm" onclick="epAddField('etiqueta')">Etiqueta</button>
+          <button class="btn btn-ghost btn-sm" onclick="epAddField('etiqueta_o_canal')">Etiq. o Canal</button>
+          <button class="btn btn-ghost btn-sm" onclick="epAddField('hash4')">Hash×4</button>
+          <button class="btn btn-ghost btn-sm" onclick="epAddField('hash8')">Hash×8</button>
+          <button class="btn btn-ghost btn-sm" onclick="epAddLiteral()">Texto libre</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="field-label">Vista previa</label>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <code id="ep-preview" style="flex:1;display:block;padding:.35rem .65rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:.82rem;color:var(--accent)">—</code>
+          <span style="font-size:.72rem;color:var(--text-dim)">ejemplo</span>
+        </div>
+      </div>
+
+      <div>
+        <label class="field-label">Plantilla generada</label>
+        <input id="ep-template-display" type="text" readonly
+               style="width:100%;font-family:'JetBrains Mono',monospace;font-size:.78rem;background:var(--surface2)">
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-export-profile')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveExportProfile()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════════════════ SCRIPT ══════════════════════════════════════ -->
 <script>
 let channels = [], sources = [], groups = [], feeds = [];
@@ -1430,14 +1506,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadChannels(), loadSources(), loadGroups(), loadFeeds(), loadConfig(), loadScheduler(), loadStreamTest(), loadEpg(), loadXmltvSources(), loadWatchdog()]);
+  await Promise.all([loadChannels(), loadSources(), loadGroups(), loadFeeds(), loadConfig(), loadScheduler(), loadStreamTest(), loadEpg(), loadXmltvSources(), loadWatchdog(), loadExportProfiles()]);
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-content').forEach(s => s.classList.toggle('active', s.id === `tab-${name}`));
-  if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); loadWatchdog(); }
+  if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); loadWatchdog(); loadExportProfiles(); }
   if (name === 'feeds') loadXmltvSources();
 }
 
@@ -2087,7 +2163,7 @@ function renderSources(list) {
       <td>${feedLabel
         ? `<span class="badge badge-blue" title="${esc(feed.url)}" style="font-size:.65rem;max-width:90px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap">${esc(feedLabel)}</span>`
         : '<span style="color:var(--text-dim);font-size:.75rem">—</span>'}</td>
-      <td>
+      <td style="white-space:nowrap">
         <div style="display:flex;gap:.4rem;align-items:center">
           <button class="btn btn-accent btn-sm" onclick="openMapModal(${s.id}, '${s.ace_hash}')">Vincular</button>
           <button class="btn btn-ghost btn-sm" id="test-btn-${s.id}" onclick="testSource(${s.id})" title="Probar stream">▶</button>
@@ -3141,6 +3217,180 @@ function esc(str) {
   return String(str ?? '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Export Profiles ───────────────────────────────────────────────────────────
+let exportProfiles = [];
+let epEditingId    = null;
+let epTokens       = [];
+
+const EP_FIELD_LABELS = {
+  canal:            'Canal',
+  etiqueta:         'Etiqueta',
+  etiqueta_o_canal: 'Etiq./Canal',
+  hash4:            'Hash×4',
+  hash8:            'Hash×8',
+};
+
+const EP_FIELD_COLORS = {
+  canal:            'badge-green',
+  etiqueta:         'badge-blue',
+  etiqueta_o_canal: 'badge-blue',
+  hash4:            'badge-orange',
+  hash8:            'badge-orange',
+};
+
+const EP_SAMPLE = {
+  canal:            'La 1 HD',
+  etiqueta:         'La-1-4K',
+  etiqueta_o_canal: 'La-1-4K',
+  hash4:            'a1b2',
+  hash8:            'a1b2c3d4',
+};
+
+function epSerialize() {
+  return epTokens.map(t => t.type === 'field' ? `{${t.value}}` : t.value).join('');
+}
+
+function epPreview() {
+  return epSerialize().replace(/\{(\w+)\}/g, (_, k) => EP_SAMPLE[k] ?? `{${k}}`);
+}
+
+function epParseTemplate(tmpl) {
+  const tokens = [];
+  const re = /\{([^}]+)\}/g;
+  let last = 0, m;
+  while ((m = re.exec(tmpl)) !== null) {
+    if (m.index > last) tokens.push({type: 'literal', value: tmpl.slice(last, m.index)});
+    tokens.push({type: 'field', value: m[1]});
+    last = m.index + m[0].length;
+  }
+  if (last < tmpl.length) tokens.push({type: 'literal', value: tmpl.slice(last)});
+  return tokens;
+}
+
+function epRender() {
+  const builder  = document.getElementById('ep-builder');
+  const preview  = document.getElementById('ep-preview');
+  const display  = document.getElementById('ep-template-display');
+
+  if (!epTokens.length) {
+    builder.innerHTML = '<span style="color:var(--text-dim);font-size:.8rem">Sin piezas — usa los botones para componer el nombre</span>';
+  } else {
+    builder.innerHTML = epTokens.map((t, i) => {
+      if (t.type === 'field') {
+        const color = EP_FIELD_COLORS[t.value] || 'badge-gray';
+        return `<span class="badge ${color}" style="display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;padding:.25rem .55rem">
+          ${EP_FIELD_LABELS[t.value] ?? t.value}
+          <span onclick="epDeleteToken(${i})" style="cursor:pointer;opacity:.75;line-height:1" title="Eliminar">×</span>
+        </span>`;
+      } else {
+        const w = Math.max(44, t.value.length * 8 + 20);
+        return `<span style="display:inline-flex;align-items:center;gap:.2rem;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:.1rem .35rem">
+          <input value="${esc(t.value)}"
+                 oninput="epUpdateLiteral(${i}, this.value)"
+                 style="border:none;background:transparent;width:${w}px;font-size:.8rem;color:var(--text);padding:0;outline:none"
+                 placeholder="texto…">
+          <span onclick="epDeleteToken(${i})" style="cursor:pointer;color:var(--text-dim);font-size:.85rem;line-height:1" title="Eliminar">×</span>
+        </span>`;
+      }
+    }).join('');
+  }
+
+  const tmpl = epSerialize();
+  preview.textContent = epTokens.length ? epPreview() : '—';
+  display.value = tmpl;
+}
+
+function epAddField(field) {
+  epTokens.push({type: 'field', value: field});
+  epRender();
+}
+
+function epAddLiteral() {
+  epTokens.push({type: 'literal', value: ' '});
+  epRender();
+}
+
+function epDeleteToken(i) {
+  epTokens.splice(i, 1);
+  epRender();
+}
+
+function epUpdateLiteral(i, val) {
+  epTokens[i].value = val;
+  document.getElementById('ep-preview').textContent = epPreview();
+  document.getElementById('ep-template-display').value = epSerialize();
+}
+
+async function loadExportProfiles() {
+  exportProfiles = await api('GET', '/api/export-profiles/');
+  renderExportProfiles();
+}
+
+function renderExportProfiles() {
+  const el = document.getElementById('export-profiles-list');
+  if (!exportProfiles.length) {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:.85rem">Sin perfiles. Crea uno con el botón de arriba.</p>';
+    return;
+  }
+  el.innerHTML = exportProfiles.map(p => {
+    const url = `${location.origin}/list/p/${p.id}`;
+    return `<div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:.4rem;flex-wrap:wrap">
+      <span style="font-weight:600;font-size:.85rem;min-width:80px">${esc(p.name)}</span>
+      <span class="badge ${p.url_type === 'proxy' ? 'badge-blue' : 'badge-green'}" style="font-size:.7rem">${p.url_type}</span>
+      <code style="font-size:.75rem;color:var(--text-muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${esc(p.name_template)}</code>
+      <div style="display:flex;gap:.35rem;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" title="Copiar URL"
+                onclick="navigator.clipboard.writeText('${url}').then(()=>this.textContent='✓').catch(()=>{});setTimeout(()=>this.textContent='📋',1500)">📋</button>
+        <a href="${url}" target="_blank" class="btn btn-ghost btn-sm" title="Descargar M3U">↓ M3U</a>
+        <button class="btn btn-accent btn-sm" onclick="openExportProfileModal(${p.id})">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteExportProfile(${p.id})">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openExportProfileModal(profileId) {
+  epEditingId = profileId ?? null;
+  if (profileId) {
+    const p = exportProfiles.find(x => x.id === profileId);
+    document.getElementById('ep-modal-title').textContent = `Editar perfil: ${p.name}`;
+    document.getElementById('ep-name').value     = p.name;
+    document.getElementById('ep-url-type').value = p.url_type;
+    epTokens = epParseTemplate(p.name_template);
+  } else {
+    document.getElementById('ep-modal-title').textContent = 'Nuevo perfil';
+    document.getElementById('ep-name').value     = '';
+    document.getElementById('ep-url-type').value = 'native';
+    epTokens = [{type: 'field', value: 'canal'}];
+  }
+  epRender();
+  openModal('modal-export-profile');
+}
+
+async function saveExportProfile() {
+  const name          = document.getElementById('ep-name').value.trim();
+  const url_type      = document.getElementById('ep-url-type').value;
+  const name_template = epSerialize() || '{canal}';
+  if (!name) { alert('El nombre es obligatorio'); return; }
+  try {
+    if (epEditingId) {
+      await api('PATCH', `/api/export-profiles/${epEditingId}`, {name, url_type, name_template});
+    } else {
+      await api('POST', '/api/export-profiles/', {name, url_type, name_template});
+    }
+    closeModal('modal-export-profile');
+    await loadExportProfiles();
+  } catch(e) { alert(e.message); }
+}
+
+async function deleteExportProfile(id) {
+  if (!confirm('¿Eliminar este perfil?')) return;
+  try {
+    await api('DELETE', `/api/export-profiles/${id}`);
+    await loadExportProfiles();
+  } catch(e) { alert(e.message); }
 }
 </script>
 <input type="file" id="logo-file-input" accept="image/*" style="display:none">

@@ -96,3 +96,13 @@ class AppConfig(Base):
 
     key = Column(String(100), primary_key=True)
     value = Column(Text, nullable=True)
+
+
+class ExportProfile(Base):
+    __tablename__ = "export_profiles"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    url_type = Column(String(10), nullable=False, default="native")
+    name_template = Column(Text, nullable=False, default="{canal}")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
