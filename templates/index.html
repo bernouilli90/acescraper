@@ -1392,10 +1392,38 @@
       <!-- Video player -->
       <div style="background:#000;border-radius:8px;overflow:hidden;position:relative;aspect-ratio:16/9">
         <video id="play-video" controls playsinline style="width:100%;height:100%;display:block"></video>
+
+        <!-- Connecting / error overlay -->
         <div id="play-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:.5rem;background:rgba(0,0,0,.75);pointer-events:none">
           <span style="font-size:2rem;line-height:1">▶</span>
           <span id="play-overlay-text" style="font-size:.8rem;opacity:.85">Conectando al stream…</span>
         </div>
+
+        <!-- Channel + EPG info overlay (bottom of video) -->
+        <div id="play-info-overlay" style="display:none;position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.88));padding:1.75rem .75rem .55rem;pointer-events:none">
+          <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.35rem">
+            <img id="play-ch-logo" src="" alt="" style="width:26px;height:26px;border-radius:4px;object-fit:contain;background:rgba(255,255,255,.1);flex-shrink:0" onerror="this.style.display='none'">
+            <span id="play-ch-name" style="font-size:.8rem;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          </div>
+          <div id="play-epg-current" style="display:none">
+            <p id="play-prog-title" style="font-size:.77rem;font-weight:600;color:#fff;margin:0 0 .2rem;text-shadow:0 1px 2px rgba(0,0,0,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+            <div style="height:3px;background:rgba(255,255,255,.22);border-radius:2px;overflow:hidden;margin-bottom:.18rem">
+              <div id="play-prog-bar" style="height:100%;background:var(--accent);border-radius:2px;transition:width .5s linear;width:0%"></div>
+            </div>
+            <p id="play-prog-times" style="font-size:.67rem;color:rgba(255,255,255,.65);margin:0"></p>
+          </div>
+          <p id="play-epg-next" style="font-size:.68rem;color:rgba(255,255,255,.55);margin:.12rem 0 0;display:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+        </div>
+      </div>
+
+      <!-- Stream selector bar -->
+      <div id="play-stream-bar" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div id="play-stream-header" style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;cursor:default" onclick="toggleStreamList()">
+          <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);flex-shrink:0">Stream</span>
+          <span id="play-stream-label" style="flex:1;font-size:.78rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0"></span>
+          <span id="play-stream-switch" style="display:none;font-size:.68rem;color:var(--accent);flex-shrink:0;cursor:pointer">▾ cambiar</span>
+        </div>
+        <div id="play-stream-list" style="display:none;border-top:1px solid var(--border);max-height:160px;overflow-y:auto"></div>
       </div>
 
       <!-- Proxy URL copy -->
@@ -3490,51 +3518,164 @@ function _buildProxyUrl(hash) {
 }
 
 let _mpegtsPlayer = null;
+let _playContext  = null;
+let _epgTimer     = null;
 
-function openPlayModal(sourceId, hash) {
-  const s     = sources.find(x => x.id === sourceId);
-  const ch    = s && channels.find(c => c.id === s.channel_id);
+async function openPlayModal(sourceId, hash) {
+  const s  = sources.find(x => x.id === sourceId);
+  const ch = s && channels.find(c => c.id === s.channel_id);
   const label = (s && s.label) || (ch && ch.name) || hash.slice(0, 12) + '…';
+
+  _playContext = { sourceId, hash, channelId: ch?.id ?? null, guideData: null };
 
   document.getElementById('play-label').textContent = label;
   document.getElementById('play-proxy-url').textContent = _buildProxyUrl(hash);
   document.getElementById('play-overlay-text').textContent = 'Conectando al stream…';
-
-  const overlay = document.getElementById('play-overlay');
-  overlay.style.display = 'flex';
+  document.getElementById('play-overlay').style.display = 'flex';
+  document.getElementById('play-info-overlay').style.display = 'none';
+  document.getElementById('play-stream-label').textContent = s?.label || hash.slice(0,16) + '…';
+  document.getElementById('play-stream-switch').style.display = 'none';
+  document.getElementById('play-stream-list').style.display = 'none';
 
   openModal('modal-play');
+  _startStream(hash);
 
-  const video = document.getElementById('play-video');
+  if (ch?.id) {
+    try {
+      const guide = await api('GET', `/api/channels/${ch.id}/guide`);
+      _playContext.guideData = guide;
+      _applyGuideToPlayer();
+    } catch(_) {}
+  }
+}
 
+function _startStream(hash) {
+  const video   = document.getElementById('play-video');
+  const overlay = document.getElementById('play-overlay');
   if (_mpegtsPlayer) { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
   video.src = '';
 
-  const streamUrl = `/api/stream/${hash}`;
-
   if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
-    _mpegtsPlayer = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: streamUrl });
+    _mpegtsPlayer = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: `/api/stream/${hash}` });
     _mpegtsPlayer.attachMediaElement(video);
     _mpegtsPlayer.load();
     _mpegtsPlayer.play();
-
     video.addEventListener('playing', () => { overlay.style.display = 'none'; }, { once: true });
-
-    _mpegtsPlayer.on(mpegts.Events.ERROR, (_type, detail) => {
+    _mpegtsPlayer.on(mpegts.Events.ERROR, (_t, d) => {
       overlay.style.display = 'flex';
-      document.getElementById('play-overlay-text').textContent =
-        'Error: ' + (detail?.msg || 'no se pudo conectar');
+      document.getElementById('play-overlay-text').textContent = 'Error: ' + (d?.msg || 'sin conexión');
     });
   } else {
-    // Safari / fallback: direct src
-    video.src = streamUrl;
+    video.src = `/api/stream/${hash}`;
     video.play().catch(() => {});
     video.addEventListener('playing', () => { overlay.style.display = 'none'; }, { once: true });
   }
 }
 
+function _applyGuideToPlayer() {
+  const g = _playContext?.guideData;
+  if (!g) return;
+
+  // Channel header on video overlay
+  const logo = document.getElementById('play-ch-logo');
+  if (g.logo) { logo.src = g.logo; logo.style.display = ''; }
+  else logo.style.display = 'none';
+  document.getElementById('play-ch-name').textContent = g.name;
+  document.getElementById('play-info-overlay').style.display = '';
+
+  // Stream switcher
+  const others = g.sources.filter(s => s.ace_hash !== _playContext.hash);
+  const switchBtn = document.getElementById('play-stream-switch');
+  if (others.length) {
+    switchBtn.style.display = '';
+    document.getElementById('play-stream-list').innerHTML = others.map(s => {
+      const lbl = s.label || s.ace_hash.slice(0,16) + '…';
+      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.42rem .65rem;cursor:pointer;border-bottom:1px solid var(--border)"
+                   onmouseenter="this.style.background='var(--surface)'"
+                   onmouseleave="this.style.background=''"
+                   onclick="switchStream(${s.id},'${s.ace_hash}')">
+        <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
+        <span style="font-size:.65rem;color:var(--accent);flex-shrink:0">▶ usar</span>
+      </div>`;
+    }).join('');
+  } else {
+    switchBtn.style.display = 'none';
+  }
+
+  // EPG
+  _refreshEpgOverlay();
+  if (_epgTimer) clearInterval(_epgTimer);
+  _epgTimer = setInterval(_refreshEpgOverlay, 30000);
+}
+
+function _refreshEpgOverlay() {
+  const schedule = _playContext?.guideData?.schedule;
+  if (!schedule) return;
+  const now = Date.now();
+  let current = null, next = null;
+  for (const p of schedule) {
+    const s = new Date(p.start).getTime(), e = new Date(p.stop).getTime();
+    if (s <= now && now < e) current = p;
+    else if (s > now && !next) next = p;
+  }
+  const curEl  = document.getElementById('play-epg-current');
+  const nextEl = document.getElementById('play-epg-next');
+  if (current) {
+    const s = new Date(current.start).getTime(), e = new Date(current.stop).getTime();
+    const pct  = Math.min(100, Math.max(0, (now - s) / (e - s) * 100)).toFixed(1);
+    const mins = Math.max(0, Math.round((e - now) / 60000));
+    document.getElementById('play-prog-title').textContent = current.title;
+    document.getElementById('play-prog-bar').style.width = pct + '%';
+    document.getElementById('play-prog-times').textContent =
+      new Date(current.start).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + ' – ' +
+      new Date(current.stop).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) + ' · ' +
+      (mins >= 60 ? `${Math.floor(mins/60)}h ${mins%60}m` : `${mins}m`) + ' restante';
+    curEl.style.display = '';
+  } else { curEl.style.display = 'none'; }
+  if (next) {
+    nextEl.textContent = 'A continuación: ' + next.title + ' · ' +
+      new Date(next.start).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    nextEl.style.display = '';
+  } else { nextEl.style.display = 'none'; }
+}
+
+function toggleStreamList() {
+  const list = document.getElementById('play-stream-list');
+  if (!list.innerHTML) return;
+  list.style.display = list.style.display === 'none' ? '' : 'none';
+}
+
+function switchStream(sourceId, hash) {
+  document.getElementById('play-stream-list').style.display = 'none';
+  const s = _playContext?.guideData?.sources?.find(x => x.id === sourceId);
+  document.getElementById('play-stream-label').textContent = s?.label || hash.slice(0,16) + '…';
+  document.getElementById('play-proxy-url').textContent = _buildProxyUrl(hash);
+  document.getElementById('play-overlay-text').textContent = 'Cambiando stream…';
+  document.getElementById('play-overlay').style.display = 'flex';
+  _playContext.hash = hash;
+  // Rebuild switcher list excluding now-active stream
+  const g = _playContext.guideData;
+  if (g) {
+    const others = g.sources.filter(x => x.ace_hash !== hash);
+    document.getElementById('play-stream-switch').style.display = others.length ? '' : 'none';
+    document.getElementById('play-stream-list').innerHTML = others.map(x => {
+      const lbl = x.label || x.ace_hash.slice(0,16) + '…';
+      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.42rem .65rem;cursor:pointer;border-bottom:1px solid var(--border)"
+                   onmouseenter="this.style.background='var(--surface)'"
+                   onmouseleave="this.style.background=''"
+                   onclick="switchStream(${x.id},'${x.ace_hash}')">
+        <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
+        <span style="font-size:.65rem;color:var(--accent);flex-shrink:0">▶ usar</span>
+      </div>`;
+    }).join('');
+  }
+  _startStream(hash);
+}
+
 function closePlayModal() {
   if (_mpegtsPlayer) { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
+  if (_epgTimer)     { clearInterval(_epgTimer); _epgTimer = null; }
+  _playContext = null;
   const video = document.getElementById('play-video');
   video.pause();
   video.src = '';
