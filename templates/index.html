@@ -397,6 +397,24 @@
     #play-video-container:-webkit-full-screen video {
       width: 100vw; height: 100vh; object-fit: contain;
     }
+    #play-vol-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 62px; height: 3px; border-radius: 2px; outline: none; cursor: pointer;
+      background: rgba(255,255,255,.35);
+    }
+    #play-vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 11px; height: 11px;
+      border-radius: 50%; background: #fff; cursor: pointer;
+    }
+    #play-vol-slider::-moz-range-thumb {
+      width: 11px; height: 11px; border: none;
+      border-radius: 50%; background: #fff; cursor: pointer;
+    }
+    .play-ctrl-btn {
+      background: none; border: none; color: #fff; cursor: pointer; padding: .2rem .3rem;
+      opacity: .85; line-height: 1; display: flex; align-items: center;
+    }
+    .play-ctrl-btn:hover { opacity: 1; }
 
     /* ── Group guide modal ── */
     .guide-item {
@@ -1409,7 +1427,7 @@
            style="background:#000;border-radius:8px;overflow:hidden;position:relative;aspect-ratio:16/9"
            onmousemove="_showInfoOverlay()" onmouseenter="_showInfoOverlay()" ontouchstart="_showInfoOverlay()">
 
-        <video id="play-video" controls playsinline controlslist="nofullscreen"
+        <video id="play-video" playsinline
                style="width:100%;height:100%;display:block"></video>
 
         <!-- Connecting / error overlay -->
@@ -1423,23 +1441,17 @@
         <!-- Info overlay (auto-hide) -->
         <div id="play-info-overlay" style="display:none;position:absolute;inset:0;pointer-events:none">
 
-          <!-- Top bar: channel + fullscreen button -->
+          <!-- Top bar: channel name + logo -->
           <div style="position:absolute;top:0;left:0;right:0;background:linear-gradient(rgba(0,0,0,.75),transparent);padding:.55rem .7rem .9rem;display:flex;align-items:center;gap:.45rem;pointer-events:auto">
             <img id="play-ch-logo" src="" alt="" style="width:40px;height:40px;border-radius:6px;object-fit:contain;background:rgba(255,255,255,.1);flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.6)" onerror="this.style.display='none'">
             <span id="play-ch-name" style="flex:1;font-size:.8rem;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-            <button onclick="togglePlayFullscreen()" title="Pantalla completa"
-                    style="background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);border-radius:5px;color:#fff;padding:.25rem .4rem;cursor:pointer;font-size:.75rem;flex-shrink:0;line-height:1">
-              <svg id="play-fs-icon" width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                <path d="M0 0h4v1.5H1.5V4H0V0zm10 0h4v4h-1.5V1.5H10V0zM0 10h1.5v2.5H4V14H0v-4zm12.5 2.5V10H14v4h-4v-1.5h2.5z"/>
-              </svg>
-            </button>
           </div>
 
-          <!-- Bottom bar: stream + EPG -->
-          <div style="position:absolute;bottom:44px;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.88));padding:1.8rem .7rem .5rem;pointer-events:auto">
+          <!-- Bottom bar: EPG + stream + controls -->
+          <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.92));padding:1.8rem .7rem 0;pointer-events:auto">
 
             <!-- Stream selector row -->
-            <div style="position:relative;margin-bottom:.45rem">
+            <div style="position:relative;margin-bottom:.4rem">
               <div onclick="toggleOverlayStreamList()" style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
                 <span style="font-size:.65rem;color:rgba(255,255,255,.5);flex-shrink:0">▶</span>
                 <span id="play-overlay-stream-label" style="flex:1;font-size:.75rem;color:rgba(255,255,255,.82);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0"></span>
@@ -1459,6 +1471,34 @@
               <p id="play-prog-times" style="font-size:.66rem;color:rgba(255,255,255,.6);margin:0"></p>
             </div>
             <p id="play-epg-next" style="font-size:.67rem;color:rgba(255,255,255,.5);margin:.1rem 0 0;display:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+
+            <!-- Playback controls row -->
+            <div style="display:flex;align-items:center;gap:.2rem;padding:.35rem 0 .4rem">
+              <!-- Play/Pause -->
+              <button id="play-pp-btn" class="play-ctrl-btn" onclick="_togglePlayPause()" title="Play/Pausa">
+                <svg id="play-pp-icon" width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+                  <path d="M5 3.5v11L14.5 9z"/>
+                </svg>
+              </button>
+              <!-- LIVE badge -->
+              <span style="font-size:.6rem;font-weight:700;letter-spacing:.04em;color:#e74c3c;border:1px solid rgba(231,76,60,.6);border-radius:3px;padding:.05rem .3rem;margin-right:.2rem;flex-shrink:0">EN VIVO</span>
+              <!-- Spacer -->
+              <div style="flex:1"></div>
+              <!-- Volume icon + slider -->
+              <button id="play-vol-btn" class="play-ctrl-btn" onclick="_toggleMute()" title="Silencio">
+                <svg id="play-vol-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                  <path id="play-vol-path" d="M3 5.5H1v5h2l4 3V2.5L3 5.5zm7.5.5a3.5 3.5 0 0 1 0 5V6zm1.5-1.5a5.5 5.5 0 0 1 0 8l-.97-.97a4 4 0 0 0 0-6.06L12 4.5z"/>
+                </svg>
+              </button>
+              <input id="play-vol-slider" type="range" min="0" max="1" step="0.02" value="1"
+                     oninput="_setVolume(this.value)" title="Volumen">
+              <!-- Fullscreen -->
+              <button class="play-ctrl-btn" onclick="togglePlayFullscreen()" title="Pantalla completa" style="margin-left:.2rem">
+                <svg id="play-fs-icon" width="15" height="15" viewBox="0 0 14 14" fill="currentColor">
+                  <path d="M0 0h4v1.5H1.5V4H0V0zm10 0h4v4h-1.5V1.5H10V0zM0 10h1.5v2.5H4V14H0v-4zm12.5 2.5V10H14v4h-4v-1.5h2.5z"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
         </div><!-- /play-info-overlay -->
@@ -3693,6 +3733,49 @@ let _epgTimer       = null;
 let _overlayTimer   = null;
 
 // ── Overlay auto-hide ─────────────────────────────────────────────────────────
+// ── Custom playback controls ──────────────────────────────────────────────────
+function _togglePlayPause() {
+  const v = document.getElementById('play-video');
+  if (!v) return;
+  if (v.paused) { v.play(); } else { v.pause(); }
+  _updatePlayPauseIcon();
+}
+function _updatePlayPauseIcon() {
+  const v = document.getElementById('play-video');
+  const icon = document.getElementById('play-pp-icon');
+  if (!v || !icon) return;
+  // pause icon (two bars) when playing, play icon (triangle) when paused
+  icon.innerHTML = v.paused
+    ? '<path d="M5 3.5v11L14.5 9z"/>'
+    : '<path d="M5 3h2.5v12H5V3zm5.5 0H13v12h-2.5V3z"/>';
+}
+function _toggleMute() {
+  const v = document.getElementById('play-video');
+  if (!v) return;
+  v.muted = !v.muted;
+  document.getElementById('play-vol-slider').value = v.muted ? 0 : v.volume;
+  _updateVolIcon(v.muted ? 0 : v.volume);
+}
+function _setVolume(val) {
+  const v = document.getElementById('play-video');
+  if (!v) return;
+  v.volume = parseFloat(val);
+  v.muted = parseFloat(val) === 0;
+  _updateVolIcon(parseFloat(val));
+  _showInfoOverlay();
+}
+function _updateVolIcon(vol) {
+  const path = document.getElementById('play-vol-path');
+  if (!path) return;
+  if (vol === 0) {
+    path.setAttribute('d', 'M3 5.5H1v5h2l4 3V2.5L3 5.5zm9 2.5l-1.06-1.06-1.06 1.06-1.06-1.06L11 5.38l1.06 1.06 1.06-1.06 1.06 1.06L13.12 7.5l1.06 1.06-1.06 1.06z');
+  } else if (vol < 0.5) {
+    path.setAttribute('d', 'M3 5.5H1v5h2l4 3V2.5L3 5.5zm6 .5a2 2 0 0 1 0 4V6z');
+  } else {
+    path.setAttribute('d', 'M3 5.5H1v5h2l4 3V2.5L3 5.5zm7.5.5a3.5 3.5 0 0 1 0 5V6zm1.5-1.5a5.5 5.5 0 0 1 0 8l-.97-.97a4 4 0 0 0 0-6.06L12 4.5z');
+  }
+}
+
 function _showInfoOverlay() {
   const ol = document.getElementById('play-info-overlay');
   if (!ol || ol.style.display === 'none') return;
@@ -3781,12 +3864,15 @@ function _startStream(hash) {
   if (_mpegtsPlayer) { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
   video.src = '';
 
+  video.onplay  = _updatePlayPauseIcon;
+  video.onpause = _updatePlayPauseIcon;
+
   if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
     _mpegtsPlayer = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: `/api/stream/${hash}` });
     _mpegtsPlayer.attachMediaElement(video);
     _mpegtsPlayer.load();
     _mpegtsPlayer.play();
-    video.addEventListener('playing', () => { overlay.style.display = 'none'; }, { once: true });
+    video.addEventListener('playing', () => { overlay.style.display = 'none'; _updatePlayPauseIcon(); }, { once: true });
     _mpegtsPlayer.on(mpegts.Events.ERROR, (_t, d) => {
       overlay.style.display = 'flex';
       document.getElementById('play-overlay-text').textContent = 'Error: ' + (d?.msg || 'sin conexión');
@@ -3794,7 +3880,7 @@ function _startStream(hash) {
   } else {
     video.src = `/api/stream/${hash}`;
     video.play().catch(() => {});
-    video.addEventListener('playing', () => { overlay.style.display = 'none'; }, { once: true });
+    video.addEventListener('playing', () => { overlay.style.display = 'none'; _updatePlayPauseIcon(); }, { once: true });
   }
 }
 
