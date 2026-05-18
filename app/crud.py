@@ -226,6 +226,15 @@ async def get_channels_for_export(db: AsyncSession) -> list:
     ]
 
 
+async def get_all_tvg_ids(db: AsyncSession) -> set[str]:
+    """All non-empty tvg_ids from every channel, for EPG generation."""
+    from sqlalchemy import text
+    result = await db.execute(
+        text("SELECT DISTINCT tvg_id FROM channels WHERE tvg_id IS NOT NULL AND tvg_id != ''")
+    )
+    return {row[0] for row in result.fetchall()}
+
+
 async def get_sources_to_test(db: AsyncSession, statuses: list[str], limit: int = 500):
     result = await db.execute(
         select(models.Source)

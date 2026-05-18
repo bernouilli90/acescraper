@@ -42,8 +42,7 @@ async def _epg_task():
 
         cfg = await crud.get_config(db)
         days = int(cfg.get("epg_days", "7"))
-        channels = await crud.get_channels_for_export(db)
-        tvg_ids = {ch.tvg_id for ch in channels}
+        tvg_ids = await crud.get_all_tvg_ids(db)
         xmltv_urls_obj = await crud.get_xmltv_urls(db)
         urls = [x.url for x in xmltv_urls_obj]
 
