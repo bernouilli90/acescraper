@@ -36,6 +36,14 @@ class Channel(Base):
     groups = relationship("Group", secondary=channel_group, back_populates="channels")
     xmltv_urls = relationship("XmltvUrl", secondary=channel_xmltv, back_populates="channels")
 
+    @property
+    def source_count(self) -> int:
+        return len(self.sources)
+
+    @property
+    def xmltv_ids(self) -> list:
+        return [x.id for x in self.xmltv_urls]
+
 
 class Source(Base):
     __tablename__ = "sources"

@@ -33,9 +33,8 @@ class ChannelOut(ChannelBase):
     id: int
     custom_logo: Optional[str] = None
     groups: list[GroupOut] = []
-    sources: list["SourceOut"] = []
-    xmltv_urls: list["XmltvUrlOut"] = []
-    created_at: Optional[datetime] = None
+    source_count: int = 0
+    xmltv_ids: list[int] = []
     model_config = {"from_attributes": True}
 
 
@@ -110,7 +109,6 @@ class XmltvImportResult(BaseModel):
     total: int
     deleted_channels: Optional[int] = None
 
-ChannelOut.model_rebuild()  # resolve XmltvUrlOut forward reference
 
 
 # --- Config ---

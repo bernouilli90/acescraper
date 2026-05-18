@@ -1198,12 +1198,11 @@
             <th>Nombre</th>
             <th style="width:90px">Tipo URL</th>
             <th>Plantilla de nombre</th>
-            <th style="width:200px">URL de descarga</th>
             <th style="width:140px">Acciones</th>
           </tr>
         </thead>
         <tbody id="export-profiles-tbody">
-          <tr class="empty-row"><td colspan="5">Cargando…</td></tr>
+          <tr class="empty-row"><td colspan="4">Cargando…</td></tr>
         </tbody>
       </table>
     </div>
@@ -1527,7 +1526,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadChannels(), loadSources(), loadGroups(), loadFeeds(), loadConfig(), loadScheduler(), loadStreamTest(), loadEpg(), loadXmltvSources(), loadWatchdog(), loadExportProfiles()]);
+  await Promise.all([loadChannels(), loadSources(), loadGroups(), loadFeeds(), loadConfig(), loadXmltvSources()]);
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -1536,7 +1535,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(s => s.classList.toggle('active', s.id === `tab-${name}`));
   if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); loadWatchdog(); }
   if (name === 'export') loadExportProfiles();
-  if (name === 'feeds') loadXmltvSources();
+  if (name === 'feeds')  { loadXmltvSources(); }
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
@@ -1605,7 +1604,7 @@ function renderChannels(list) {
           <button class="edit-groups-btn" onclick="openChannelGroupsModal(${ch.id})" title="Editar grupos">✎</button>
         </div>
       </td>
-      <td style="text-align:center"><span class="badge ${ch.sources.length ? 'badge-green' : 'badge-gray'}">${ch.sources.length}</span></td>
+      <td style="text-align:center"><span class="badge ${ch.source_count ? 'badge-green' : 'badge-gray'}">${ch.source_count}</span></td>
       <td>
         <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap">
           ${ch.custom_logo ? `<button class="btn btn-ghost btn-sm" onclick="deleteChannelLogo(${ch.id})" title="Eliminar logo personalizado (vuelve al XMLTV)">✕ Logo</button>` : ''}
@@ -1622,8 +1621,11 @@ function rebuildXmltvFilter() {
   while (sel.options.length > 1) sel.remove(1);
   // Collect unique xmltv sources from loaded channels
   const seen = new Map();
-  channels.forEach(c => (c.xmltv_urls || []).forEach(x => {
-    if (!seen.has(x.id)) seen.set(x.id, x.label || x.url);
+  channels.forEach(c => (c.xmltv_ids || []).forEach(id => {
+    if (!seen.has(id)) {
+      const src = xmltvSources.find(x => x.id === id);
+      seen.set(id, src ? (src.label || src.url) : String(id));
+    }
   }));
   seen.forEach((label, id) => sel.add(new Option(label, String(id))));
   sel.value = current;
@@ -1636,9 +1638,9 @@ function filterChannels() {
   const logo    = document.getElementById('ch-f-logo').value;
   renderChannels(channels.filter(c => {
     if (q && !c.name.toLowerCase().includes(q) && !c.tvg_id.toLowerCase().includes(q)) return false;
-    if (xmltvId && !(c.xmltv_urls || []).some(x => String(x.id) === xmltvId)) return false;
-    if (hashes === 'with'    && c.sources.length === 0) return false;
-    if (hashes === 'without' && c.sources.length > 0)  return false;
+    if (xmltvId && !(c.xmltv_ids || []).some(id => String(id) === xmltvId)) return false;
+    if (hashes === 'with'    && c.source_count === 0) return false;
+    if (hashes === 'without' && c.source_count > 0)   return false;
     if (logo === 'custom' && !c.custom_logo)            return false;
     if (logo === 'xmltv'  && (c.custom_logo || !c.logo)) return false;
     if (logo === 'any'    && !c.custom_logo && !c.logo) return false;
@@ -2188,7 +2190,7 @@ function renderSources(list) {
       <td style="white-space:nowrap">
         <div style="display:flex;gap:.4rem;align-items:center">
           <button class="btn btn-accent btn-sm" onclick="openMapModal(${s.id}, '${s.ace_hash}')">Vincular</button>
-          <button class="btn btn-ghost btn-sm" id="test-btn-${s.id}" onclick="testSource(${s.id})" title="Probar stream">▶</button>
+          <button class="btn btn-ghost btn-sm" id="test-btn-${s.id}" onclick="testSource(${s.id})" title="Probar stream">⊙</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})">×</button>
         </div>
       </td>
@@ -3118,7 +3120,7 @@ async function testSource(sourceId) {
     filterSources();
   } catch(e) { alert(e.message); }
   finally {
-    if (btn) { btn.disabled = false; btn.textContent = '▶'; }
+    if (btn) { btn.disabled = false; btn.textContent = '⊙'; }
   }
 }
 
@@ -3362,13 +3364,6 @@ function renderExportProfiles() {
       <td style="font-weight:600">${esc(p.name)}</td>
       <td><span class="badge ${p.url_type === 'proxy' ? 'badge-blue' : 'badge-green'}">${p.url_type}</span></td>
       <td><code style="font-size:.78rem;color:var(--text-muted)">${esc(p.name_template)}</code></td>
-      <td>
-        <div style="display:flex;gap:.3rem;align-items:center">
-          <code style="font-size:.7rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px" title="${esc(url)}">/list/p/${p.id}</code>
-          <button class="btn btn-ghost btn-sm" title="Copiar URL"
-                  onclick="navigator.clipboard.writeText('${url}').then(()=>this.textContent='✓').catch(()=>{});setTimeout(()=>this.textContent='⎘',1200)">⎘</button>
-        </div>
-      </td>
       <td style="white-space:nowrap">
         <div style="display:flex;gap:.35rem">
           <a href="${url}" target="_blank" class="btn btn-ghost btn-sm">↓ M3U</a>
