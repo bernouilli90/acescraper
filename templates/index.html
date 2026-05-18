@@ -383,6 +383,21 @@
 
     .modal-scroll { max-height: 260px; overflow-y: auto; padding-right: 2px; }
 
+    /* ── Player ── */
+    #play-video-container { cursor: default; }
+    #play-video-container.hide-cursor { cursor: none; }
+    #play-info-overlay { transition: opacity .35s; }
+    #play-info-overlay.hidden { opacity: 0 !important; pointer-events: none !important; }
+    #play-video-container:fullscreen,
+    #play-video-container:-webkit-full-screen {
+      aspect-ratio: auto; width: 100vw; height: 100vh;
+      border-radius: 0; background: #000;
+    }
+    #play-video-container:fullscreen video,
+    #play-video-container:-webkit-full-screen video {
+      width: 100vw; height: 100vh; object-fit: contain;
+    }
+
     /* ── Group guide modal ── */
     .guide-item {
       display: flex; align-items: flex-start; gap: .75rem;
@@ -1389,9 +1404,13 @@
 
     <div style="padding:.75rem 1rem 1rem;display:flex;flex-direction:column;gap:.65rem">
 
-      <!-- Video player -->
-      <div style="background:#000;border-radius:8px;overflow:hidden;position:relative;aspect-ratio:16/9">
-        <video id="play-video" controls playsinline style="width:100%;height:100%;display:block"></video>
+      <!-- Video player (fullscreenable container) -->
+      <div id="play-video-container"
+           style="background:#000;border-radius:8px;overflow:hidden;position:relative;aspect-ratio:16/9"
+           onmousemove="_showInfoOverlay()" onmouseenter="_showInfoOverlay()" ontouchstart="_showInfoOverlay()">
+
+        <video id="play-video" controls playsinline controlslist="nofullscreen"
+               style="width:100%;height:100%;display:block"></video>
 
         <!-- Connecting / error overlay -->
         <div id="play-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:.5rem;background:rgba(0,0,0,.75);pointer-events:none">
@@ -1399,26 +1418,53 @@
           <span id="play-overlay-text" style="font-size:.8rem;opacity:.85">Conectando al stream…</span>
         </div>
 
-        <!-- Channel + EPG info overlay (bottom of video) -->
-        <div id="play-info-overlay" style="display:none;position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.88));padding:1.75rem .75rem .55rem;pointer-events:none">
-          <div style="display:flex;align-items:center;gap:.45rem;margin-bottom:.35rem">
-            <img id="play-ch-logo" src="" alt="" style="width:26px;height:26px;border-radius:4px;object-fit:contain;background:rgba(255,255,255,.1);flex-shrink:0" onerror="this.style.display='none'">
-            <span id="play-ch-name" style="font-size:.8rem;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-          </div>
-          <div id="play-epg-current" style="display:none">
-            <p id="play-prog-title" style="font-size:.77rem;font-weight:600;color:#fff;margin:0 0 .2rem;text-shadow:0 1px 2px rgba(0,0,0,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
-            <div style="height:3px;background:rgba(255,255,255,.22);border-radius:2px;overflow:hidden;margin-bottom:.18rem">
-              <div id="play-prog-bar" style="height:100%;background:var(--accent);border-radius:2px;transition:width .5s linear;width:0%"></div>
-            </div>
-            <p id="play-prog-times" style="font-size:.67rem;color:rgba(255,255,255,.65);margin:0"></p>
-          </div>
-          <p id="play-epg-next" style="font-size:.68rem;color:rgba(255,255,255,.55);margin:.12rem 0 0;display:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
-        </div>
-      </div>
+        <!-- Info overlay (auto-hide) -->
+        <div id="play-info-overlay" style="display:none;position:absolute;inset:0;pointer-events:none">
 
-      <!-- Stream selector bar -->
+          <!-- Top bar: channel + fullscreen button -->
+          <div style="position:absolute;top:0;left:0;right:0;background:linear-gradient(rgba(0,0,0,.75),transparent);padding:.55rem .7rem .9rem;display:flex;align-items:center;gap:.45rem;pointer-events:auto">
+            <img id="play-ch-logo" src="" alt="" style="width:26px;height:26px;border-radius:4px;object-fit:contain;background:rgba(255,255,255,.1);flex-shrink:0" onerror="this.style.display='none'">
+            <span id="play-ch-name" style="flex:1;font-size:.8rem;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+            <button onclick="togglePlayFullscreen()" title="Pantalla completa"
+                    style="background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);border-radius:5px;color:#fff;padding:.25rem .4rem;cursor:pointer;font-size:.75rem;flex-shrink:0;line-height:1">
+              <svg id="play-fs-icon" width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                <path d="M0 0h4v1.5H1.5V4H0V0zm10 0h4v4h-1.5V1.5H10V0zM0 10h1.5v2.5H4V14H0v-4zm12.5 2.5V10H14v4h-4v-1.5h2.5z"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Bottom bar: stream + EPG -->
+          <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.88));padding:1.8rem .7rem .5rem;pointer-events:auto">
+
+            <!-- Stream selector row -->
+            <div style="position:relative;margin-bottom:.45rem">
+              <div onclick="toggleOverlayStreamList()" style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+                <span style="font-size:.65rem;color:rgba(255,255,255,.5);flex-shrink:0">▶</span>
+                <span id="play-overlay-stream-label" style="flex:1;font-size:.75rem;color:rgba(255,255,255,.82);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0"></span>
+                <span id="play-overlay-stream-switch" style="display:none;font-size:.65rem;color:rgba(255,255,255,.6);flex-shrink:0">▾ cambiar</span>
+              </div>
+              <!-- Dropdown (expands upward) -->
+              <div id="play-overlay-stream-list"
+                   style="display:none;position:absolute;bottom:calc(100% + .3rem);left:0;right:0;background:rgba(15,20,27,.93);border:1px solid rgba(255,255,255,.15);border-radius:6px;max-height:150px;overflow-y:auto;z-index:10"></div>
+            </div>
+
+            <!-- EPG current -->
+            <div id="play-epg-current" style="display:none">
+              <p id="play-prog-title" style="font-size:.77rem;font-weight:600;color:#fff;margin:0 0 .18rem;text-shadow:0 1px 2px rgba(0,0,0,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+              <div style="height:3px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden;margin-bottom:.16rem">
+                <div id="play-prog-bar" style="height:100%;background:var(--accent);border-radius:2px;transition:width .5s linear;width:0%"></div>
+              </div>
+              <p id="play-prog-times" style="font-size:.66rem;color:rgba(255,255,255,.6);margin:0"></p>
+            </div>
+            <p id="play-epg-next" style="font-size:.67rem;color:rgba(255,255,255,.5);margin:.1rem 0 0;display:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+          </div>
+
+        </div><!-- /play-info-overlay -->
+      </div><!-- /play-video-container -->
+
+      <!-- Stream bar below (non-fullscreen convenience) -->
       <div id="play-stream-bar" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden">
-        <div id="play-stream-header" style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;cursor:default" onclick="toggleStreamList()">
+        <div style="display:flex;align-items:center;gap:.5rem;padding:.45rem .65rem;cursor:default" onclick="toggleStreamList()">
           <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);flex-shrink:0">Stream</span>
           <span id="play-stream-label" style="flex:1;font-size:.78rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0"></span>
           <span id="play-stream-switch" style="display:none;font-size:.68rem;color:var(--accent);flex-shrink:0;cursor:pointer">▾ cambiar</span>
@@ -3517,9 +3563,59 @@ function _buildProxyUrl(hash) {
   return `http://${window.location.hostname}:${acexyConfig.port}/ace/getstream?id=${hash}`;
 }
 
-let _mpegtsPlayer = null;
-let _playContext  = null;
-let _epgTimer     = null;
+let _mpegtsPlayer   = null;
+let _playContext    = null;
+let _epgTimer       = null;
+let _overlayTimer   = null;
+
+// ── Overlay auto-hide ─────────────────────────────────────────────────────────
+function _showInfoOverlay() {
+  const ol = document.getElementById('play-info-overlay');
+  if (!ol || ol.style.display === 'none') return;
+  ol.classList.remove('hidden');
+  document.getElementById('play-video-container').classList.remove('hide-cursor');
+  if (_overlayTimer) clearTimeout(_overlayTimer);
+  _overlayTimer = setTimeout(() => {
+    ol.classList.add('hidden');
+    document.getElementById('play-video-container').classList.add('hide-cursor');
+    document.getElementById('play-overlay-stream-list').style.display = 'none';
+  }, 3000);
+}
+
+// ── Fullscreen ────────────────────────────────────────────────────────────────
+function togglePlayFullscreen() {
+  const c = document.getElementById('play-video-container');
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  } else {
+    (c.requestFullscreen || c.webkitRequestFullscreen).call(c);
+  }
+}
+
+function _onFullscreenChange() {
+  const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  // If native video FS was triggered (not our container), re-enter with container
+  const vid = document.getElementById('play-video');
+  if ((document.fullscreenElement === vid || document.webkitFullscreenElement === vid)) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document).then(() => {
+      const c = document.getElementById('play-video-container');
+      (c.requestFullscreen || c.webkitRequestFullscreen).call(c);
+    }).catch(() => {});
+    return;
+  }
+  // Update icon
+  const icon = document.getElementById('play-fs-icon');
+  if (!icon) return;
+  if (isFs) {
+    icon.innerHTML = '<path d="M4 0H0v4h1.5V1.5H4V0zm6 0v1.5h2.5V4H14V0h-4zM0 10v4h4v-1.5H1.5V10H0zm12.5 2.5V14H14v-4h-1.5v2.5z"/>';
+  } else {
+    icon.innerHTML = '<path d="M0 0h4v1.5H1.5V4H0V0zm10 0h4v4h-1.5V1.5H10V0zM0 10h1.5v2.5H4V14H0v-4zm12.5 2.5V10H14v4h-4v-1.5h2.5z"/>';
+  }
+  _showInfoOverlay();
+}
+
+document.addEventListener('fullscreenchange',       _onFullscreenChange);
+document.addEventListener('webkitfullscreenchange', _onFullscreenChange);
 
 async function openPlayModal(sourceId, hash) {
   const s  = sources.find(x => x.id === sourceId);
@@ -3528,14 +3624,20 @@ async function openPlayModal(sourceId, hash) {
 
   _playContext = { sourceId, hash, channelId: ch?.id ?? null, guideData: null };
 
+  const streamLabel = s?.label || hash.slice(0,16) + '…';
   document.getElementById('play-label').textContent = label;
   document.getElementById('play-proxy-url').textContent = _buildProxyUrl(hash);
   document.getElementById('play-overlay-text').textContent = 'Conectando al stream…';
   document.getElementById('play-overlay').style.display = 'flex';
   document.getElementById('play-info-overlay').style.display = 'none';
-  document.getElementById('play-stream-label').textContent = s?.label || hash.slice(0,16) + '…';
+  document.getElementById('play-info-overlay').classList.remove('hidden');
+  document.getElementById('play-stream-label').textContent = streamLabel;
+  document.getElementById('play-overlay-stream-label').textContent = streamLabel;
   document.getElementById('play-stream-switch').style.display = 'none';
+  document.getElementById('play-overlay-stream-switch').style.display = 'none';
   document.getElementById('play-stream-list').style.display = 'none';
+  document.getElementById('play-overlay-stream-list').style.display = 'none';
+  if (_overlayTimer) { clearTimeout(_overlayTimer); _overlayTimer = null; }
 
   openModal('modal-play');
   _startStream(hash);
@@ -3572,40 +3674,55 @@ function _startStream(hash) {
   }
 }
 
+function _buildStreamItems(others, dark) {
+  return others.map(s => {
+    const lbl = s.label || s.ace_hash.slice(0,16) + '…';
+    if (dark) {
+      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.1)"
+                   onmouseenter="this.style.background='rgba(255,255,255,.08)'"
+                   onmouseleave="this.style.background=''"
+                   onclick="switchStream(${s.id},'${s.ace_hash}')">
+        <span style="font-size:.76rem;flex:1;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
+        <span style="font-size:.63rem;color:rgba(255,255,255,.55);flex-shrink:0">▶ usar</span>
+      </div>`;
+    }
+    return `<div style="display:flex;align-items:center;gap:.5rem;padding:.42rem .65rem;cursor:pointer;border-bottom:1px solid var(--border)"
+                 onmouseenter="this.style.background='var(--surface)'"
+                 onmouseleave="this.style.background=''"
+                 onclick="switchStream(${s.id},'${s.ace_hash}')">
+      <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
+      <span style="font-size:.65rem;color:var(--accent);flex-shrink:0">▶ usar</span>
+    </div>`;
+  }).join('');
+}
+
 function _applyGuideToPlayer() {
   const g = _playContext?.guideData;
   if (!g) return;
 
-  // Channel header on video overlay
+  // Channel header
   const logo = document.getElementById('play-ch-logo');
   if (g.logo) { logo.src = g.logo; logo.style.display = ''; }
   else logo.style.display = 'none';
   document.getElementById('play-ch-name').textContent = g.name;
-  document.getElementById('play-info-overlay').style.display = '';
+  const ol = document.getElementById('play-info-overlay');
+  ol.style.display = '';
+  ol.classList.remove('hidden');
 
-  // Stream switcher
+  // Stream switchers (bar below + overlay)
   const others = g.sources.filter(s => s.ace_hash !== _playContext.hash);
-  const switchBtn = document.getElementById('play-stream-switch');
-  if (others.length) {
-    switchBtn.style.display = '';
-    document.getElementById('play-stream-list').innerHTML = others.map(s => {
-      const lbl = s.label || s.ace_hash.slice(0,16) + '…';
-      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.42rem .65rem;cursor:pointer;border-bottom:1px solid var(--border)"
-                   onmouseenter="this.style.background='var(--surface)'"
-                   onmouseleave="this.style.background=''"
-                   onclick="switchStream(${s.id},'${s.ace_hash}')">
-        <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
-        <span style="font-size:.65rem;color:var(--accent);flex-shrink:0">▶ usar</span>
-      </div>`;
-    }).join('');
-  } else {
-    switchBtn.style.display = 'none';
-  }
+  document.getElementById('play-stream-switch').style.display = others.length ? '' : 'none';
+  document.getElementById('play-overlay-stream-switch').style.display = others.length ? '' : 'none';
+  document.getElementById('play-stream-list').innerHTML = _buildStreamItems(others, false);
+  document.getElementById('play-overlay-stream-list').innerHTML = _buildStreamItems(others, true);
 
   // EPG
   _refreshEpgOverlay();
   if (_epgTimer) clearInterval(_epgTimer);
   _epgTimer = setInterval(_refreshEpgOverlay, 30000);
+
+  // Start auto-hide timer
+  _showInfoOverlay();
 }
 
 function _refreshEpgOverlay() {
@@ -3645,40 +3762,48 @@ function toggleStreamList() {
   list.style.display = list.style.display === 'none' ? '' : 'none';
 }
 
+function toggleOverlayStreamList() {
+  const list = document.getElementById('play-overlay-stream-list');
+  if (!list.innerHTML) return;
+  list.style.display = list.style.display === 'none' ? '' : 'none';
+  _showInfoOverlay(); // reset hide timer when interacting
+}
+
 function switchStream(sourceId, hash) {
   document.getElementById('play-stream-list').style.display = 'none';
+  document.getElementById('play-overlay-stream-list').style.display = 'none';
   const s = _playContext?.guideData?.sources?.find(x => x.id === sourceId);
-  document.getElementById('play-stream-label').textContent = s?.label || hash.slice(0,16) + '…';
+  const lbl = s?.label || hash.slice(0,16) + '…';
+  document.getElementById('play-stream-label').textContent = lbl;
+  document.getElementById('play-overlay-stream-label').textContent = lbl;
   document.getElementById('play-proxy-url').textContent = _buildProxyUrl(hash);
   document.getElementById('play-overlay-text').textContent = 'Cambiando stream…';
   document.getElementById('play-overlay').style.display = 'flex';
   _playContext.hash = hash;
-  // Rebuild switcher list excluding now-active stream
   const g = _playContext.guideData;
   if (g) {
     const others = g.sources.filter(x => x.ace_hash !== hash);
-    document.getElementById('play-stream-switch').style.display = others.length ? '' : 'none';
-    document.getElementById('play-stream-list').innerHTML = others.map(x => {
-      const lbl = x.label || x.ace_hash.slice(0,16) + '…';
-      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.42rem .65rem;cursor:pointer;border-bottom:1px solid var(--border)"
-                   onmouseenter="this.style.background='var(--surface)'"
-                   onmouseleave="this.style.background=''"
-                   onclick="switchStream(${x.id},'${x.ace_hash}')">
-        <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
-        <span style="font-size:.65rem;color:var(--accent);flex-shrink:0">▶ usar</span>
-      </div>`;
-    }).join('');
+    const hasOthers = others.length > 0;
+    document.getElementById('play-stream-switch').style.display = hasOthers ? '' : 'none';
+    document.getElementById('play-overlay-stream-switch').style.display = hasOthers ? '' : 'none';
+    document.getElementById('play-stream-list').innerHTML = _buildStreamItems(others, false);
+    document.getElementById('play-overlay-stream-list').innerHTML = _buildStreamItems(others, true);
   }
   _startStream(hash);
+  _showInfoOverlay();
 }
 
 function closePlayModal() {
-  if (_mpegtsPlayer) { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
-  if (_epgTimer)     { clearInterval(_epgTimer); _epgTimer = null; }
+  if (_mpegtsPlayer)  { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
+  if (_epgTimer)      { clearInterval(_epgTimer); _epgTimer = null; }
+  if (_overlayTimer)  { clearTimeout(_overlayTimer); _overlayTimer = null; }
   _playContext = null;
+  if (document.fullscreenElement || document.webkitFullscreenElement)
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(() => {});
   const video = document.getElementById('play-video');
   video.pause();
   video.src = '';
+  document.getElementById('play-video-container').classList.remove('hide-cursor');
   closeModal('modal-play');
 }
 
