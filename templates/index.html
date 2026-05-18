@@ -1488,6 +1488,28 @@
   </div>
 </div>
 
+<!-- Modal: channel detail -->
+<div id="modal-channel-detail" class="modal-overlay">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:.65rem;min-width:0">
+        <img id="chd-logo" src="" alt="" style="width:40px;height:40px;border-radius:6px;object-fit:contain;background:var(--surface2);border:1px solid var(--border);flex-shrink:0" onerror="this.style.display='none'">
+        <div style="min-width:0">
+          <h3 id="chd-name" style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></h3>
+          <p id="chd-tvgid" style="margin:0;font-size:.7rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-channel-detail')">&times;</button>
+    </div>
+    <div id="chd-body" style="max-height:72vh;overflow-y:auto">
+      <p style="padding:1rem;color:var(--text-muted);font-size:.85rem">Cargando…</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-channel-detail')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: export profile -->
 <div id="modal-export-profile" class="modal-overlay">
   <div class="modal-box" style="max-width:580px">
@@ -1742,8 +1764,12 @@ function renderChannels(list) {
         </div>
       </td>
       <td>
-        <span id="ch-name-${ch.id}" style="font-weight:600;cursor:text;border-bottom:1px dashed var(--border2)"
-              title="Clic para editar nombre" onclick="inlineEditName(${ch.id})">${esc(ch.name)}</span>
+        <div style="display:flex;align-items:center;gap:.35rem">
+          <span id="ch-name-${ch.id}" style="font-weight:600;cursor:pointer;color:var(--text)"
+                title="Ver detalle del canal" onclick="openChannelModal(${ch.id})">${esc(ch.name)}</span>
+          <button style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:.7rem;padding:.1rem .2rem;line-height:1;border-radius:3px;flex-shrink:0"
+                  title="Editar nombre" onclick="event.stopPropagation();inlineEditName(${ch.id})">✎</button>
+        </div>
       </td>
       <td><span class="mono-sm" style="color:var(--text-muted)">${esc(ch.tvg_id)}</span></td>
       <td>
@@ -1835,6 +1861,101 @@ async function deleteChannel(id) {
   if (!confirm('¿Eliminar este canal y desvincular sus hashes?')) return;
   await api('DELETE', `/api/channels/${id}`);
   await loadChannels();
+}
+
+async function openChannelModal(channelId) {
+  const body = document.getElementById('chd-body');
+  body.innerHTML = '<p style="padding:1rem;color:var(--text-muted);font-size:.85rem">Cargando…</p>';
+  document.getElementById('chd-logo').style.display = 'none';
+  document.getElementById('chd-name').textContent = '';
+  document.getElementById('chd-tvgid').textContent = '';
+  openModal('modal-channel-detail');
+
+  let data;
+  try {
+    data = await api('GET', `/api/channels/${channelId}/detail`);
+  } catch(e) {
+    body.innerHTML = `<p style="padding:1rem;color:var(--red,#f85149);font-size:.85rem">Error: ${esc(e.message)}</p>`;
+    return;
+  }
+
+  // Header
+  const logo = document.getElementById('chd-logo');
+  if (data.logo) { logo.src = data.logo; logo.style.display = ''; }
+  document.getElementById('chd-name').textContent = data.name;
+  document.getElementById('chd-tvgid').textContent = data.tvg_id;
+
+  // ── Streams ────────────────────────────────────────────────────────────────
+  const streamsHtml = data.sources.length
+    ? data.sources.map(s => {
+        const lbl = s.label
+          ? `<span style="font-size:.82rem;font-weight:500">${esc(s.label)}</span>`
+          : `<span style="font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-muted)">${s.ace_hash.slice(0,20)}…</span>`;
+
+        const activeBadge = s.active
+          ? '<span class="badge badge-green"  style="font-size:.62rem">Activo</span>'
+          : '<span class="badge badge-gray"   style="font-size:.62rem">Inactivo</span>';
+
+        let testBadge;
+        if      (s.test_status === 'ok')   testBadge = '<span class="badge badge-green"  style="font-size:.62rem">✓ OK</span>';
+        else if (s.test_status === 'fail')  testBadge = '<span class="badge badge-red"   style="font-size:.62rem">✗ Fallo</span>';
+        else if (s.test_status === 'dead')  testBadge = '<span class="badge badge-red"   style="font-size:.62rem">✗ Muerto</span>';
+        else                                testBadge = '<span class="badge badge-gray"  style="font-size:.62rem">Sin test</span>';
+
+        const canPlay = s.active && s.test_status === 'ok';
+        const playBtn = canPlay
+          ? `<button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="closeModal('modal-channel-detail');openPlayModal(${s.id},'${s.ace_hash}')">▶ Reproducir</button>`
+          : '';
+
+        return `<div style="display:flex;align-items:center;gap:.45rem;padding:.5rem .9rem;border-bottom:1px solid var(--border);flex-wrap:wrap">
+          ${lbl}
+          <div style="display:flex;gap:.3rem;align-items:center;margin-left:auto;flex-shrink:0">
+            ${activeBadge}${testBadge}${playBtn}
+          </div>
+        </div>`;
+      }).join('')
+    : '<p style="padding:.6rem .9rem;font-size:.82rem;color:var(--text-muted)">Sin streams asociados</p>';
+
+  // ── EPG schedule ──────────────────────────────────────────────────────────
+  const now = Date.now();
+  let schedHtml = '';
+  if (data.schedule.length) {
+    schedHtml = data.schedule.map(p => {
+      const pStart    = new Date(p.start).getTime();
+      const pStop     = new Date(p.stop).getTime();
+      const isCurrent = pStart <= now && now < pStop;
+      const startStr  = new Date(p.start).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      const stopStr   = new Date(p.stop).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      const pct       = isCurrent
+        ? Math.min(100, Math.max(0, (now - pStart) / (pStop - pStart) * 100)).toFixed(1)
+        : 0;
+      const descHtml  = p.desc
+        ? `<p style="font-size:.7rem;color:var(--text-muted);margin:.2rem 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(p.desc)}</p>`
+        : '';
+      const progressHtml = isCurrent
+        ? `<div class="guide-prog-bar" style="margin:.28rem 0 .1rem"><div class="guide-prog-fill" style="width:${pct}%"></div></div>`
+        : '';
+      return `<div style="display:flex;gap:.6rem;padding:.48rem .9rem;border-bottom:1px solid var(--border);${isCurrent ? 'background:var(--accent-bg)' : ''}">
+        <div style="min-width:96px;font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--text-muted);padding-top:.1rem;flex-shrink:0">${startStr} – ${stopStr}</div>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:.83rem;font-weight:${isCurrent ? 600 : 400};color:var(--text);margin:0">${isCurrent ? '▶ ' : ''}${esc(p.title)}</p>
+          ${progressHtml}${descHtml}
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    schedHtml = '<p style="padding:.6rem .9rem;font-size:.82rem;color:var(--text-muted)">Sin datos EPG disponibles</p>';
+  }
+
+  body.innerHTML = `
+    <div style="padding:.5rem .9rem .25rem;background:var(--surface2);border-bottom:1px solid var(--border)">
+      <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted)">Streams (${data.sources.length})</span>
+    </div>
+    ${streamsHtml}
+    <div style="padding:.5rem .9rem .25rem;border-bottom:1px solid var(--border)">
+      <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted)">Programación – próximas 12h</span>
+    </div>
+    ${schedHtml}`;
 }
 
 // ── Logo upload ───────────────────────────────────────────────────────────────

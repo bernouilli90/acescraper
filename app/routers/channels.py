@@ -164,3 +164,33 @@ async def channel_guide(channel_id: int, db: AsyncSession = Depends(get_db)):
         ],
         "schedule": schedule,
     }
+
+
+@router.get("/{channel_id}/detail")
+async def channel_detail(channel_id: int, db: AsyncSession = Depends(get_db)):
+    """All sources (any status) + EPG schedule for the channel detail modal."""
+    ch = await crud.get_channel(db, channel_id)
+    if not ch:
+        raise HTTPException(status_code=404, detail="Canal no encontrado")
+
+    schedule = await asyncio.to_thread(_channel_schedule, ch.tvg_id)
+
+    return {
+        "id":     ch.id,
+        "name":   ch.name,
+        "tvg_id": ch.tvg_id,
+        "logo":   f"/static/logos/{ch.custom_logo}" if ch.custom_logo else ch.logo,
+        "sources": [
+            {
+                "id":           s.id,
+                "ace_hash":     s.ace_hash,
+                "label":        s.label,
+                "active":       s.active,
+                "test_status":  s.test_status,
+                "test_last_run": s.test_last_run.isoformat() if s.test_last_run else None,
+                "fail_since":   s.fail_since.isoformat() if s.fail_since else None,
+            }
+            for s in sorted(ch.sources, key=lambda s: (not s.active, s.test_status != "ok", s.id))
+        ],
+        "schedule": schedule,
+    }
