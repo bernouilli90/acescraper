@@ -1413,9 +1413,11 @@
                style="width:100%;height:100%;display:block"></video>
 
         <!-- Connecting / error overlay -->
-        <div id="play-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:.5rem;background:rgba(0,0,0,.75);pointer-events:none">
-          <span style="font-size:2rem;line-height:1">▶</span>
-          <span id="play-overlay-text" style="font-size:.8rem;opacity:.85">Conectando al stream…</span>
+        <div id="play-overlay" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:.6rem;background:rgba(0,0,0,.75);pointer-events:none">
+          <img id="play-loading-logo" src="" alt="" style="display:none;width:64px;height:64px;border-radius:10px;object-fit:contain;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15)" onerror="this.style.display='none'">
+          <span id="play-loading-name" style="display:none;font-size:.85rem;font-weight:700;opacity:.9;text-align:center;max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <span style="font-size:1.5rem;line-height:1;opacity:.6">▶</span>
+          <span id="play-overlay-text" style="font-size:.8rem;opacity:.75">Conectando al stream…</span>
         </div>
 
         <!-- Info overlay (auto-hide) -->
@@ -1423,7 +1425,7 @@
 
           <!-- Top bar: channel + fullscreen button -->
           <div style="position:absolute;top:0;left:0;right:0;background:linear-gradient(rgba(0,0,0,.75),transparent);padding:.55rem .7rem .9rem;display:flex;align-items:center;gap:.45rem;pointer-events:auto">
-            <img id="play-ch-logo" src="" alt="" style="width:26px;height:26px;border-radius:4px;object-fit:contain;background:rgba(255,255,255,.1);flex-shrink:0" onerror="this.style.display='none'">
+            <img id="play-ch-logo" src="" alt="" style="width:40px;height:40px;border-radius:6px;object-fit:contain;background:rgba(255,255,255,.1);flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.6)" onerror="this.style.display='none'">
             <span id="play-ch-name" style="flex:1;font-size:.8rem;font-weight:700;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
             <button onclick="togglePlayFullscreen()" title="Pantalla completa"
                     style="background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);border-radius:5px;color:#fff;padding:.25rem .4rem;cursor:pointer;font-size:.75rem;flex-shrink:0;line-height:1">
@@ -3700,10 +3702,18 @@ function _applyGuideToPlayer() {
   const g = _playContext?.guideData;
   if (!g) return;
 
-  // Channel header
+  // Channel header (info overlay + loading overlay)
   const logo = document.getElementById('play-ch-logo');
-  if (g.logo) { logo.src = g.logo; logo.style.display = ''; }
-  else logo.style.display = 'none';
+  const loadingLogo = document.getElementById('play-loading-logo');
+  const loadingName = document.getElementById('play-loading-name');
+  if (g.logo) {
+    logo.src = g.logo; logo.style.display = '';
+    loadingLogo.src = g.logo; loadingLogo.style.display = '';
+  } else {
+    logo.style.display = 'none';
+    loadingLogo.style.display = 'none';
+  }
+  loadingName.textContent = g.name; loadingName.style.display = '';
   document.getElementById('play-ch-name').textContent = g.name;
   const ol = document.getElementById('play-info-overlay');
   ol.style.display = '';
