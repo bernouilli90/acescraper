@@ -1,5 +1,8 @@
+import asyncio
 import glob
 import os
+from datetime import datetime, timezone, timedelta
+from lxml import etree
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -7,6 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app import crud, schemas
+from app.scraper import _parse_xmltv_dt
+
+EPG_FILE = os.getenv("EPG_FILE", "./data/epg.xml")
 
 router = APIRouter(prefix="/api/channels", tags=["channels"])
 
@@ -98,3 +104,63 @@ async def update_channel(channel_id: int, data: schemas.ChannelUpdate, db: Async
 @router.delete("/{channel_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_channel(channel_id: int, db: AsyncSession = Depends(get_db)):
     await crud.delete_channel(db, channel_id)
+
+
+def _channel_schedule(tvg_id: str, hours_ahead: int = 12) -> list:
+    """Programs for tvg_id in [now-1h, now+hours_ahead], sorted by start."""
+    if not tvg_id or not os.path.exists(EPG_FILE):
+        return []
+    now    = datetime.now(timezone.utc)
+    cutoff = now + timedelta(hours=hours_ahead)
+    past   = now - timedelta(hours=1)
+    progs  = []
+    try:
+        for _, elem in etree.iterparse(EPG_FILE, events=("end",), tag="programme", recover=True):
+            if elem.get("channel", "") == tvg_id:
+                start = _parse_xmltv_dt(elem.get("start", ""))
+                stop  = _parse_xmltv_dt(elem.get("stop",  ""))
+                if start and stop and stop >= past and start <= cutoff:
+                    title_el = elem.find("title")
+                    desc_el  = elem.find("desc")
+                    progs.append({
+                        "title": title_el.text if title_el is not None else "",
+                        "start": start.isoformat(),
+                        "stop":  stop.isoformat(),
+                        "desc":  desc_el.text if desc_el is not None else None,
+                    })
+            parent = elem.getparent()
+            elem.clear()
+            if parent is not None:
+                parent.remove(elem)
+    except Exception:
+        pass
+    progs.sort(key=lambda p: p["start"])
+    return progs
+
+
+@router.get("/{channel_id}/guide")
+async def channel_guide(channel_id: int, db: AsyncSession = Depends(get_db)):
+    ch = await crud.get_channel(db, channel_id)
+    if not ch:
+        raise HTTPException(status_code=404, detail="Canal no encontrado")
+
+    active_sources = [s for s in ch.sources if s.active and s.test_status == "ok"]
+    schedule = await asyncio.to_thread(_channel_schedule, ch.tvg_id)
+
+    return {
+        "id":    ch.id,
+        "name":  ch.name,
+        "logo":  f"/static/logos/{ch.custom_logo}" if ch.custom_logo else ch.logo,
+        "tvg_id": ch.tvg_id,
+        "sources": [
+            {
+                "id":          s.id,
+                "ace_hash":    s.ace_hash,
+                "label":       s.label,
+                "test_status": s.test_status,
+                "test_last_run": s.test_last_run.isoformat() if s.test_last_run else None,
+            }
+            for s in active_sources
+        ],
+        "schedule": schedule,
+    }

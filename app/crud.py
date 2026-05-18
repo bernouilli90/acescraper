@@ -270,6 +270,20 @@ async def get_groups(db: AsyncSession):
     return result.scalars().all()
 
 
+async def get_group_channels_with_active_sources(db: AsyncSession, group_id: int):
+    """Channels in the group (ordered) that have at least one active source."""
+    q = (
+        select(models.Channel)
+        .join(models.channel_group, models.Channel.id == models.channel_group.c.channel_id)
+        .where(models.channel_group.c.group_id == group_id)
+        .options(selectinload(models.Channel.sources))
+        .order_by(models.channel_group.c.position, models.Channel.id)
+    )
+    result = await db.execute(q)
+    channels = result.scalars().all()
+    return [ch for ch in channels if any(s.active for s in ch.sources)]
+
+
 async def create_group(db: AsyncSession, data: schemas.GroupCreate):
     group = models.Group(name=data.name)
     db.add(group)
