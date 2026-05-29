@@ -3879,10 +3879,12 @@ function _onFullscreenChange() {
   // If native video FS was triggered (not our container), re-enter with container
   const vid = document.getElementById('play-video');
   if ((document.fullscreenElement === vid || document.webkitFullscreenElement === vid)) {
-    (document.exitFullscreen || document.webkitExitFullscreen).call(document).then(() => {
-      const c = document.getElementById('play-video-container');
-      (c.requestFullscreen || c.webkitRequestFullscreen).call(c);
-    }).catch(() => {});
+    // Promise.resolve wrap: webkitExitFullscreen may not return a Promise in older Safari
+    Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document))
+      .then(() => {
+        const c = document.getElementById('play-video-container');
+        (c.requestFullscreen || c.webkitRequestFullscreen).call(c);
+      }).catch(() => {});
     return;
   }
   // Update icon
@@ -3927,6 +3929,8 @@ async function openPlayModal(sourceId, hash) {
   if (ch?.id) {
     try {
       const guide = await api('GET', `/api/channels/${ch.id}/guide`);
+      // Guard: discard guide if user switched or closed the modal while this was loading
+      if (_playContext?.sourceId !== sourceId) return;
       _playContext.guideData = guide;
       _applyGuideToPlayer();
     } catch(_) {}
@@ -3936,18 +3940,30 @@ async function openPlayModal(sourceId, hash) {
 function _startStream(hash) {
   const video   = document.getElementById('play-video');
   const overlay = document.getElementById('play-overlay');
-  if (_mpegtsPlayer) { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
-  video.src = '';
 
-  video.onplay  = _updatePlayPauseIcon;
-  video.onpause = _updatePlayPauseIcon;
+  // Teardown previous player before reusing the video element
+  if (_mpegtsPlayer) {
+    _mpegtsPlayer.destroy();
+    _mpegtsPlayer = null;
+  }
+  video.pause();
+  video.src = '';
+  video.load(); // reset media element, cancel pending requests
+
+  video.onplay    = _updatePlayPauseIcon;
+  video.onpause   = _updatePlayPauseIcon;
+  // Assignment instead of addEventListener avoids listener accumulation on rapid stream switches
+  video.onplaying = () => { overlay.style.display = 'none'; _updatePlayPauseIcon(); };
+  video.onerror   = () => {
+    overlay.style.display = 'flex';
+    document.getElementById('play-overlay-text').textContent = 'Error: sin conexión';
+  };
 
   if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
     _mpegtsPlayer = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: `/api/stream/${hash}` });
     _mpegtsPlayer.attachMediaElement(video);
     _mpegtsPlayer.load();
     _mpegtsPlayer.play();
-    video.addEventListener('playing', () => { overlay.style.display = 'none'; _updatePlayPauseIcon(); }, { once: true });
     _mpegtsPlayer.on(mpegts.Events.ERROR, (_t, d) => {
       overlay.style.display = 'flex';
       document.getElementById('play-overlay-text').textContent = 'Error: ' + (d?.msg || 'sin conexión');
@@ -3955,28 +3971,24 @@ function _startStream(hash) {
   } else {
     video.src = `/api/stream/${hash}`;
     video.play().catch(() => {});
-    video.addEventListener('playing', () => { overlay.style.display = 'none'; _updatePlayPauseIcon(); }, { once: true });
   }
 }
 
 function _buildStreamItems(others, dark) {
+  const borderColor  = dark ? 'rgba(255,255,255,.1)' : 'var(--border)';
+  const hoverBg      = dark ? 'rgba(255,255,255,.08)' : 'var(--surface)';
+  const labelColor   = dark ? 'color:#fff;' : '';
+  const labelSize    = dark ? '.76rem' : '.78rem';
+  const actionColor  = dark ? 'color:rgba(255,255,255,.55)' : 'color:var(--accent)';
+  const actionSize   = dark ? '.63rem' : '.65rem';
   return others.map(s => {
-    const lbl = s.label || s.ace_hash.slice(0,16) + '…';
-    if (dark) {
-      return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.1)"
-                   onmouseenter="this.style.background='rgba(255,255,255,.08)'"
-                   onmouseleave="this.style.background=''"
-                   onclick="switchStream(${s.id},'${s.ace_hash}')">
-        <span style="font-size:.76rem;flex:1;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
-        <span style="font-size:.63rem;color:rgba(255,255,255,.55);flex-shrink:0">▶ usar</span>
-      </div>`;
-    }
-    return `<div style="display:flex;align-items:center;gap:.5rem;padding:.42rem .65rem;cursor:pointer;border-bottom:1px solid var(--border)"
-                 onmouseenter="this.style.background='var(--surface)'"
+    const lbl = s.label || s.ace_hash.slice(0, 16) + '…';
+    return `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;cursor:pointer;border-bottom:1px solid ${borderColor}"
+                 onmouseenter="this.style.background='${hoverBg}'"
                  onmouseleave="this.style.background=''"
                  onclick="switchStream(${s.id},'${s.ace_hash}')">
-      <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
-      <span style="font-size:.65rem;color:var(--accent);flex-shrink:0">▶ usar</span>
+      <span style="font-size:${labelSize};flex:1;${labelColor}overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(lbl)}</span>
+      <span style="font-size:${actionSize};${actionColor};flex-shrink:0">▶ usar</span>
     </div>`;
   }).join('');
 }
@@ -4092,10 +4104,15 @@ function closePlayModal() {
   if (_overlayTimer)  { clearTimeout(_overlayTimer); _overlayTimer = null; }
   _playContext = null;
   if (document.fullscreenElement || document.webkitFullscreenElement)
-    (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(() => {});
+    Promise.resolve((document.exitFullscreen || document.webkitExitFullscreen).call(document)).catch(() => {});
   const video = document.getElementById('play-video');
+  video.onplay    = null;
+  video.onpause   = null;
+  video.onplaying = null;
+  video.onerror   = null;
   video.pause();
   video.src = '';
+  video.load(); // cancel pending requests and fully reset the media element
   document.getElementById('play-video-container').classList.remove('hide-cursor');
   closeModal('modal-play');
 }
