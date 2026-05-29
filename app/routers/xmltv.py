@@ -44,11 +44,9 @@ async def import_xmltv_file(file: UploadFile = File(...), db: AsyncSession = Dep
     for ch in channels:
         existing = await crud.get_channel_by_tvg_id(db, ch["tvg_id"])
         if existing:
-            from app import schemas as s
-            await crud.update_channel(db, existing.id, s.ChannelUpdate(name=ch["name"], logo=ch.get("logo")))
+            await crud.update_channel(db, existing.id, schemas.ChannelUpdate(name=ch["name"], logo=ch.get("logo")))
             updated += 1
         else:
-            from app import schemas as s
-            await crud.create_channel(db, s.ChannelCreate(tvg_id=ch["tvg_id"], name=ch["name"], logo=ch.get("logo")))
+            await crud.create_channel(db, schemas.ChannelCreate(tvg_id=ch["tvg_id"], name=ch["name"], logo=ch.get("logo")))
             created += 1
     return schemas.XmltvImportResult(created=created, updated=updated, total=len(channels))

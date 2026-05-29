@@ -54,9 +54,11 @@ async def _epg_task():
 
     async with AsyncSessionLocal() as db:
         now = datetime.now(timezone.utc).isoformat()
-        await crud.set_config(db, "epg_last_generated", now)
-        await crud.set_config(db, "epg_channel_count", str(ch_count))
-        await crud.set_config(db, "epg_programme_count", str(prog_count))
+        await crud.set_configs(db, {
+            "epg_last_generated":  now,
+            "epg_channel_count":   str(ch_count),
+            "epg_programme_count": str(prog_count),
+        })
 
 
 def _next_run(scheduler):
@@ -100,9 +102,11 @@ async def update_config(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    await crud.set_config(db, "epg_enabled", str(data.enabled).lower())
-    await crud.set_config(db, "epg_interval_hours", str(data.interval_hours))
-    await crud.set_config(db, "epg_days", str(data.days))
+    await crud.set_configs(db, {
+        "epg_enabled":        str(data.enabled).lower(),
+        "epg_interval_hours": str(data.interval_hours),
+        "epg_days":           str(data.days),
+    })
     apply_epg_config(_get_scheduler(request), data.interval_hours, data.enabled)
     return await _build_status(request, db)
 

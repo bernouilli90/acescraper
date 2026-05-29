@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.requests import Request
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,7 +57,6 @@ async def _build_m3u(db: AsyncSession, url_builder, base_url: str, name_template
 @router.get("/native", response_class=PlainTextResponse)
 async def export_native(
     request: Request,
-    group: str = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     content = await _build_m3u(db, lambda h: f"acestream://{h}", str(request.base_url))
@@ -67,7 +66,6 @@ async def export_native(
 @router.get("/proxy", response_class=PlainTextResponse)
 async def export_proxy(
     request: Request,
-    group: str = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     config = await crud.get_config(db)

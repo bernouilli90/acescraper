@@ -18,7 +18,7 @@ async def proxy_stream(ace_hash: str, db: AsyncSession = Depends(get_db)):
 
     cfg = await crud.get_config(db)
     ip   = cfg.get("acexy_ip",   "127.0.0.1")
-    port = int(cfg.get("acexy_port", "8080"))
+    port = int(cfg.get("acexy_port", "6878"))
     url  = f"http://{ip}:{port}/ace/getstream?id={ace_hash}"
 
     async def _gen():

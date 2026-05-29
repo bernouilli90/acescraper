@@ -135,16 +135,18 @@ async def update_config(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    await crud.set_config(db, "stream_test_enabled",               str(data.enabled).lower())
-    await crud.set_config(db, "stream_test_interval_fail",          str(data.interval_fail_minutes))
-    await crud.set_config(db, "stream_test_interval_ok",            str(data.interval_ok_minutes))
-    await crud.set_config(db, "stream_test_concurrency",            str(data.concurrency))
-    await crud.set_config(db, "stream_test_restart_enabled",        str(data.restart_before_test).lower())
-    await crud.set_config(db, "stream_test_restart_after_enabled",  str(data.restart_after_test).lower())
-    await crud.set_config(db, "stream_test_restart_containers",     data.restart_containers)
-    await crud.set_config(db, "stream_test_restart_wait_seconds",   str(data.restart_wait_seconds))
-    await crud.set_config(db, "stream_test_auto_deactivate_enabled", str(data.auto_deactivate_enabled).lower())
-    await crud.set_config(db, "stream_test_auto_deactivate_hours",   str(data.auto_deactivate_hours))
+    await crud.set_configs(db, {
+        "stream_test_enabled":               str(data.enabled).lower(),
+        "stream_test_interval_fail":         str(data.interval_fail_minutes),
+        "stream_test_interval_ok":           str(data.interval_ok_minutes),
+        "stream_test_concurrency":           str(data.concurrency),
+        "stream_test_restart_enabled":       str(data.restart_before_test).lower(),
+        "stream_test_restart_after_enabled": str(data.restart_after_test).lower(),
+        "stream_test_restart_containers":    data.restart_containers,
+        "stream_test_restart_wait_seconds":  str(data.restart_wait_seconds),
+        "stream_test_auto_deactivate_enabled": str(data.auto_deactivate_enabled).lower(),
+        "stream_test_auto_deactivate_hours": str(data.auto_deactivate_hours),
+    })
     apply_test_config(_get_scheduler(request), data.interval_fail_minutes, data.interval_ok_minutes, data.enabled)
     return await get_config(request, db)
 

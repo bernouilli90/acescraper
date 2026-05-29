@@ -68,8 +68,10 @@ async def update_config(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    await crud.set_config(db, "scheduler_enabled", str(data.enabled).lower())
-    await crud.set_config(db, "scheduler_interval_minutes", str(data.interval_minutes))
+    await crud.set_configs(db, {
+        "scheduler_enabled":          str(data.enabled).lower(),
+        "scheduler_interval_minutes": str(data.interval_minutes),
+    })
     scheduler = _get_scheduler(request)
     apply_config(scheduler, data.interval_minutes, data.enabled)
     return await get_status(request, db)

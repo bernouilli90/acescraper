@@ -105,11 +105,13 @@ async def get_status(db: AsyncSession = Depends(get_db)):
 
 @router.put("/config")
 async def update_config(data: schemas.WatchdogConfig, request: Request, db: AsyncSession = Depends(get_db)):
-    await crud.set_config(db, "watchdog_enabled",             str(data.enabled).lower())
-    await crud.set_config(db, "watchdog_interval_minutes",    str(data.interval_minutes))
-    await crud.set_config(db, "watchdog_auto_restart",        str(data.auto_restart).lower())
-    await crud.set_config(db, "watchdog_acexy_container",     data.acexy_container)
-    await crud.set_config(db, "watchdog_acestream_container", data.acestream_container)
+    await crud.set_configs(db, {
+        "watchdog_enabled":             str(data.enabled).lower(),
+        "watchdog_interval_minutes":    str(data.interval_minutes),
+        "watchdog_auto_restart":        str(data.auto_restart).lower(),
+        "watchdog_acexy_container":     data.acexy_container,
+        "watchdog_acestream_container": data.acestream_container,
+    })
     apply_watchdog_config(_get_scheduler(request), data.interval_minutes, data.enabled)
     return await get_status(db)
 

@@ -142,8 +142,17 @@ feed_progress: dict = {
     "running": False, "current": 0, "total": 0, "current_url": None,
 }
 
+_test_lock = asyncio.Lock()
+
 
 async def run_stream_tests(statuses: list[str]):
+    if _test_lock.locked():
+        return
+    async with _test_lock:
+        await _run_stream_tests(statuses)
+
+
+async def _run_stream_tests(statuses: list[str]):
     from app import crud
     from app.database import AsyncSessionLocal
     async with AsyncSessionLocal() as db:

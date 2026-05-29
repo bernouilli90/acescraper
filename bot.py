@@ -260,7 +260,7 @@ async def cb_restart(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
 
 MAX_RESULTS = 20
 
-STATUS_ICON = {"ok": "✅", "fail": "❌", "untested": "❓"}
+STATUS_ICON = {"ok": "✅", "fail": "❌", "untested": "❓", "dead": "💀"}
 
 
 async def cmd_buscar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -282,7 +282,7 @@ async def cmd_buscar(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     matches = [
         ch for ch in channels
-        if query in ch["name"].lower() and ch.get("sources")
+        if query in ch["name"].lower() and ch.get("source_count", 0) > 0
     ]
 
     if not matches:
@@ -325,20 +325,15 @@ async def cb_channel(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         ip, port = "127.0.0.1", 6878
 
     try:
-        channels = await _get("/api/channels/")
+        detail = await _get(f"/api/channels/{channel_id}/detail")
     except Exception as e:
         await query.edit_message_text(f"❌ Error: {e}")
         return
 
-    channel = next((ch for ch in channels if ch["id"] == channel_id), None)
-    if not channel:
-        await query.edit_message_text("❌ Canal no encontrado.")
-        return
-
-    sources = channel.get("sources", [])
+    sources = detail.get("sources", [])
     if not sources:
         await query.edit_message_text(
-            f"⚠️ <b>{html.escape(channel['name'])}</b> no tiene hashes asignados.",
+            f"⚠️ <b>{html.escape(detail.get('name', 'Canal'))}</b> no tiene hashes asignados.",
             parse_mode="HTML",
         )
         return
@@ -355,7 +350,7 @@ async def cb_channel(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton(btn_label, url=ace_url)])
 
     await query.edit_message_text(
-        f"📺 <b>{html.escape(channel['name'])}</b>",
+        f"📺 <b>{html.escape(detail['name'])}</b>",
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )

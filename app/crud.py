@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import selectinload
 from typing import Optional
 from app import models, schemas
@@ -123,23 +124,37 @@ async def bulk_create_sources(
     - Existing hash without channel: assign channel from tvg_id if available.
     - Existing hash with channel already set: skip (never override).
     """
+    if not entries:
+        return {"new": 0, "duplicates": 0, "mapped": 0}
+
+    # Batch-fetch channels by tvg_id (1 query instead of N)
+    tvg_ids = {e['tvg_id'] for e in entries if e.get('tvg_id')}
+    channel_by_tvg: dict[str, int] = {}
+    if tvg_ids:
+        res = await db.execute(
+            select(models.Channel.tvg_id, models.Channel.id)
+            .where(models.Channel.tvg_id.in_(tvg_ids))
+        )
+        channel_by_tvg = {row[0]: row[1] for row in res.fetchall()}
+
+    # Batch-fetch existing sources by hash (1 query instead of N)
+    hashes = [e['ace_hash'] for e in entries]
+    res = await db.execute(
+        select(models.Source).where(models.Source.ace_hash.in_(hashes))
+    )
+    existing_by_hash: dict[str, models.Source] = {s.ace_hash: s for s in res.scalars().all()}
+
     new_count    = 0
     dup_count    = 0
     mapped_count = 0
 
     for entry in entries:
-        h       = entry['ace_hash']
-        tvg_id  = entry.get('tvg_id')
-        label   = entry.get('label')
+        h          = entry['ace_hash']
+        tvg_id     = entry.get('tvg_id')
+        label      = entry.get('label')
+        channel_id = channel_by_tvg.get(tvg_id) if tvg_id else None
 
-        # Resolve tvg_id → channel once per entry
-        channel_id: Optional[int] = None
-        if tvg_id:
-            ch = await get_channel_by_tvg_id(db, tvg_id)
-            if ch:
-                channel_id = ch.id
-
-        existing = await get_source_by_hash(db, h)
+        existing = existing_by_hash.get(h)
         if existing:
             dup_count += 1
             if existing.channel_id is None and channel_id is not None:
@@ -148,12 +163,14 @@ async def bulk_create_sources(
             if existing.label is None and label:
                 existing.label = label
         else:
-            db.add(models.Source(
+            new_src = models.Source(
                 ace_hash=h,
                 label=label,
                 feed_url_id=feed_url_id,
                 channel_id=channel_id,
-            ))
+            )
+            db.add(new_src)
+            existing_by_hash[h] = new_src  # evitar dobles dentro del mismo batch
             new_count += 1
             if channel_id is not None:
                 mapped_count += 1
@@ -213,17 +230,6 @@ async def mark_long_failing_sources_dead(db: AsyncSession, threshold_hours: int)
     )
     await db.commit()
     return result.rowcount
-
-
-async def get_channels_for_export(db: AsyncSession) -> list:
-    """Channels that have at least one active+ok source (same logic as M3U export)."""
-    result = await db.execute(
-        select(models.Channel).options(selectinload(models.Channel.sources))
-    )
-    return [
-        ch for ch in result.scalars().all()
-        if any(s.active and s.test_status == "ok" for s in ch.sources)
-    ]
 
 
 async def get_all_tvg_ids(db: AsyncSession) -> set[str]:
@@ -399,24 +405,36 @@ async def import_xmltv_channels(db: AsyncSession, channels: list[dict], xmltv_id
     if not xmltv:
         return {"created": 0, "updated": 0, "total": 0}
 
+    # Batch-fetch all existing channels by tvg_id (1 query instead of N)
+    tvg_ids = [ch["tvg_id"] for ch in channels]
+    res = await db.execute(
+        select(models.Channel).where(models.Channel.tvg_id.in_(tvg_ids))
+    )
+    existing_by_tvg: dict[str, models.Channel] = {ch.tvg_id: ch for ch in res.scalars().all()}
+
+    # Batch-fetch existing xmltv links for all known channels (1 query instead of N)
+    existing_ch_ids = [ch.id for ch in existing_by_tvg.values()]
+    linked_channel_ids: set[int] = set()
+    if existing_ch_ids:
+        res = await db.execute(
+            select(models.channel_xmltv.c.channel_id)
+            .where(models.channel_xmltv.c.xmltv_id == xmltv_id)
+            .where(models.channel_xmltv.c.channel_id.in_(existing_ch_ids))
+        )
+        linked_channel_ids = {row[0] for row in res.fetchall()}
+
     created = updated = 0
     for ch in channels:
-        existing = await get_channel_by_tvg_id(db, ch["tvg_id"])
+        existing = existing_by_tvg.get(ch["tvg_id"])
         if existing:
             existing.name = ch["name"]
             if ch.get("logo"):
                 existing.logo = ch["logo"]
-            # Link to this xmltv if not already linked
-            linked_ids_result = await db.execute(
-                select(models.channel_xmltv.c.xmltv_id).where(
-                    models.channel_xmltv.c.channel_id == existing.id,
-                    models.channel_xmltv.c.xmltv_id == xmltv_id,
-                )
-            )
-            if linked_ids_result.scalar_one_or_none() is None:
+            if existing.id not in linked_channel_ids:
                 await db.execute(
                     models.channel_xmltv.insert().values(channel_id=existing.id, xmltv_id=xmltv_id)
                 )
+                linked_channel_ids.add(existing.id)
             updated += 1
         else:
             new_ch = models.Channel(tvg_id=ch["tvg_id"], name=ch["name"], logo=ch.get("logo"))
@@ -425,6 +443,7 @@ async def import_xmltv_channels(db: AsyncSession, channels: list[dict], xmltv_id
             await db.execute(
                 models.channel_xmltv.insert().values(channel_id=new_ch.id, xmltv_id=xmltv_id)
             )
+            existing_by_tvg[ch["tvg_id"]] = new_ch
             created += 1
 
     from datetime import datetime, timezone
@@ -446,14 +465,17 @@ async def get_config(db: AsyncSession) -> dict:
 
 
 async def set_config(db: AsyncSession, key: str, value: str):
-    result = await db.execute(
-        select(models.AppConfig).where(models.AppConfig.key == key)
-    )
-    existing = result.scalar_one_or_none()
-    if existing:
-        existing.value = value
-    else:
-        db.add(models.AppConfig(key=key, value=value))
+    stmt = sqlite_insert(models.AppConfig).values(key=key, value=value)
+    stmt = stmt.on_conflict_do_update(index_elements=["key"], set_={"value": value})
+    await db.execute(stmt)
+    await db.commit()
+
+
+async def set_configs(db: AsyncSession, updates: dict):
+    for key, value in updates.items():
+        stmt = sqlite_insert(models.AppConfig).values(key=key, value=value)
+        stmt = stmt.on_conflict_do_update(index_elements=["key"], set_={"value": value})
+        await db.execute(stmt)
     await db.commit()
 
 
