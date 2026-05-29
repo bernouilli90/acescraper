@@ -35,7 +35,7 @@ async def _build_m3u(db: AsyncSession, url_builder, base_url: str, name_template
 
     lines = ["#EXTM3U"]
     for ch in channels:
-        active_sources = [s for s in ch.sources if s.active and s.test_status == "ok"]
+        active_sources = [s for s in ch.sources if s.active and s.test_status == "ok" and not s.deleted]
         if not active_sources:
             continue
         group_title = ch.groups[0].name if ch.groups else "Sin grupo"

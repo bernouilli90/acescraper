@@ -192,8 +192,31 @@ async def update_source(db: AsyncSession, source_id: int, data: schemas.SourceUp
 
 
 async def delete_source(db: AsyncSession, source_id: int):
-    await db.execute(delete(models.Source).where(models.Source.id == source_id))
+    await db.execute(
+        update(models.Source)
+        .where(models.Source.id == source_id)
+        .values(deleted=True)
+    )
     await db.commit()
+
+
+async def restore_source(db: AsyncSession, source_id: int):
+    await db.execute(
+        update(models.Source)
+        .where(models.Source.id == source_id)
+        .values(deleted=False)
+    )
+    await db.commit()
+
+
+async def bulk_restore_sources(db: AsyncSession, ids: list[int]) -> int:
+    result = await db.execute(
+        update(models.Source)
+        .where(models.Source.id.in_(ids))
+        .values(deleted=False)
+    )
+    await db.commit()
+    return result.rowcount
 
 
 async def update_source_test_result(db: AsyncSession, source_id: int, status: str) -> str:
@@ -249,6 +272,7 @@ async def get_sources_to_test(db: AsyncSession, statuses: list[str], limit: int 
     result = await db.execute(
         select(models.Source)
         .where(models.Source.active.is_(True))
+        .where(models.Source.deleted.is_(False))
         .where(models.Source.test_status.in_(statuses))
         .order_by(models.Source.test_last_run.asc().nullsfirst())
         .limit(limit)
@@ -257,7 +281,11 @@ async def get_sources_to_test(db: AsyncSession, statuses: list[str], limit: int 
 
 
 async def bulk_delete_sources(db: AsyncSession, ids: list[int]) -> int:
-    result = await db.execute(delete(models.Source).where(models.Source.id.in_(ids)))
+    result = await db.execute(
+        update(models.Source)
+        .where(models.Source.id.in_(ids))
+        .values(deleted=True)
+    )
     await db.commit()
     return result.rowcount
 

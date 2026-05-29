@@ -68,6 +68,7 @@ class SourceOut(SourceBase):
     test_status: str = "untested"
     test_last_run: Optional[datetime] = None
     fail_since: Optional[datetime] = None
+    deleted: bool = False
     model_config = {"from_attributes": True}
 
 

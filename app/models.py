@@ -58,6 +58,7 @@ class Source(Base):
     test_status = Column(String(10), nullable=False, default="untested")
     test_last_run = Column(DateTime(timezone=True), nullable=True)
     fail_since = Column(DateTime(timezone=True), nullable=True)
+    deleted = Column(Boolean, default=False, nullable=False)
 
     channel = relationship("Channel", back_populates="sources")
     feed_url = relationship("FeedUrl", back_populates="sources")

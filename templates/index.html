@@ -349,6 +349,34 @@
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
 
+    /* ── Navbar short labels (hidden on desktop) ── */
+    .nav-short { display: none; }
+
+    /* ── Mobile responsive (≤ 640 px) ─────────────────────────────────── */
+    @media (max-width: 640px) {
+      main { padding: .75rem .75rem 3rem !important; }
+      .navbar { padding: 0 .75rem; gap: .4rem; }
+      .nav-links { gap: .35rem; }
+      .nav-long  { display: none; }
+      .nav-short { display: inline; }
+      .tabs { overflow-x: auto; scrollbar-width: none; padding: 0 .25rem; }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tab-btn { padding: .75rem .75rem; font-size: .8rem; }
+      .section-header { flex-wrap: wrap; gap: .5rem; }
+      .btn { min-height: 42px; }
+      .btn-sm, .btn-danger { min-height: 36px; }
+      input:not([type=checkbox]):not([type=file]),
+      select, textarea { font-size: 16px; }
+      .flex-row { flex-direction: column; align-items: stretch; }
+      .flex-row input { width: 100% !important; }
+      .ch-filter-grid { grid-template-columns: 1fr !important; }
+      #bulk-bar { flex-wrap: wrap !important; }
+      #status-panel { width: min(300px, calc(100vw - 2rem)); right: 1rem; }
+      .modal-overlay { padding: .5rem; }
+      .modal-box { padding: 1rem; max-height: 88vh; overflow-y: auto; }
+      .ep-grid-2 { grid-template-columns: 1fr !important; }
+    }
+
     /* ── Group pill (clickable) ── */
     .group-pill {
       display: inline-flex; align-items: center; gap: .3rem;
@@ -541,10 +569,10 @@
   </svg>
   <span style="font-size:1rem;font-weight:700;color:var(--text)">AceScraper</span>
   <nav class="nav-links">
-    <a href="/list/native" target="_blank" class="export">↓ M3U Native</a>
-    <a href="/list/proxy"  target="_blank" class="export">↓ M3U Proxy</a>
+    <a href="/list/native" target="_blank" class="export"><span class="nav-long">↓ M3U Native</span><span class="nav-short">↓ Native</span></a>
+    <a href="/list/proxy"  target="_blank" class="export"><span class="nav-long">↓ M3U Proxy</span><span class="nav-short">↓ Proxy</span></a>
     <a href="/epg.xml"     target="_blank" class="export">↓ EPG</a>
-    <a href="/docs"        target="_blank">API Docs</a>
+    <a href="/docs"        target="_blank"><span class="nav-long">API Docs</span><span class="nav-short">Docs</span></a>
   </nav>
 </nav>
 
@@ -572,7 +600,7 @@
   <!-- Search -->
   <div class="card">
     <div class="card-body" style="padding:.75rem 1rem">
-      <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:.6rem;align-items:end">
+      <div class="ch-filter-grid" style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:.6rem;align-items:end">
         <div>
           <label class="field-label" style="margin-bottom:.3rem">Buscar</label>
           <input id="ch-search" type="search" placeholder="Nombre o tvg-id…"
@@ -641,8 +669,9 @@
       <span id="src-counter" class="badge badge-gray" style="font-size:.75rem"></span>
       <div id="bulk-bar" style="display:none;align-items:center;gap:.5rem">
         <span id="bulk-count" style="font-size:.8rem;color:var(--text-muted)"></span>
-        <button class="btn btn-accent btn-sm" onclick="openBulkAssignModal()">Asignar canal</button>
-        <button class="btn btn-danger btn-sm" onclick="bulkDelete()">🗑 Eliminar</button>
+        <button id="bulk-assign-btn" class="btn btn-accent btn-sm" onclick="openBulkAssignModal()">Asignar canal</button>
+        <button id="bulk-delete-btn" class="btn btn-danger btn-sm" onclick="bulkDelete()">🗑 Eliminar</button>
+        <button id="bulk-restore-btn" class="btn btn-ghost btn-sm" onclick="bulkRestore()" style="display:none">↺ Restaurar</button>
         <button class="btn btn-ghost btn-sm" onclick="clearSelection()">Deseleccionar todo</button>
       </div>
     </div>
@@ -682,6 +711,7 @@
             <option value="fail">Fallo</option>
             <option value="untested">Sin probar</option>
             <option value="dead">Muerto</option>
+            <option value="deleted">Eliminado</option>
           </select>
         </div>
         <div>
@@ -1560,7 +1590,7 @@
 
     <div style="padding:1rem;display:flex;flex-direction:column;gap:.85rem">
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+      <div class="ep-grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
         <div>
           <label class="field-label">Nombre del perfil</label>
           <input id="ep-name" type="text" placeholder="Mi lista" style="width:100%">
@@ -2286,7 +2316,16 @@ function filterSources() {
   const feedId  = document.getElementById('src-f-feed').value;
   const groupF  = document.getElementById('src-f-group').value;
 
+  const isDeletedView = testF === 'deleted';
+  _updateBulkBarMode(isDeletedView);
+
   let list = sources.filter(s => {
+    // Deleted sources are hidden unless the "deleted" filter is active
+    if (isDeletedView) {
+      if (!s.deleted) return false;
+    } else {
+      if (s.deleted) return false;
+    }
     if (text) {
       const inHash  = s.ace_hash.includes(text);
       const inLabel = (s.label || '').toLowerCase().includes(text);
@@ -2299,7 +2338,7 @@ function filterSources() {
     }
     if (status === 'active'   && !s.active) return false;
     if (status === 'inactive' &&  s.active) return false;
-    if (testF && (s.test_status || 'untested') !== testF) return false;
+    if (!isDeletedView && testF && (s.test_status || 'untested') !== testF) return false;
     if (feedId && s.feed_url_id !== +feedId) return false;
     if (groupF) {
       const ch = channels.find(c => c.id === s.channel_id);
@@ -2416,14 +2455,42 @@ async function submitBulkAssign() {
   } catch(e) { alert(e.message); }
 }
 
+function _updateBulkBarMode(isDeletedView) {
+  const delBtn  = document.getElementById('bulk-delete-btn');
+  const resBtn  = document.getElementById('bulk-restore-btn');
+  const asnBtn  = document.getElementById('bulk-assign-btn');
+  if (!delBtn) return;
+  delBtn.style.display = isDeletedView ? 'none' : '';
+  asnBtn.style.display = isDeletedView ? 'none' : '';
+  resBtn.style.display = isDeletedView ? ''     : 'none';
+}
+
 async function bulkDelete() {
   const ids = [...selectedSources];
   if (!ids.length) return;
-  if (!confirm(`¿Eliminar ${ids.length} hash${ids.length !== 1 ? 'es' : ''}? Esta acción no se puede deshacer.`)) return;
+  if (!confirm(`¿Marcar como eliminados ${ids.length} hash${ids.length !== 1 ? 'es' : ''}?`)) return;
   try {
-    const r = await api('DELETE', '/api/sources/bulk', ids);
+    await api('DELETE', '/api/sources/bulk', ids);
     selectedSources.clear();
     updateBulkBar();
+    await loadSources();
+  } catch(e) { alert(e.message); }
+}
+
+async function bulkRestore() {
+  const ids = [...selectedSources];
+  if (!ids.length) return;
+  try {
+    await api('POST', '/api/sources/bulk-restore', ids);
+    selectedSources.clear();
+    updateBulkBar();
+    await loadSources();
+  } catch(e) { alert(e.message); }
+}
+
+async function restoreSource(id) {
+  try {
+    await api('POST', `/api/sources/${id}/restore`);
     await loadSources();
   } catch(e) { alert(e.message); }
 }
@@ -2440,6 +2507,7 @@ function clearSourceFilters() {
     const el = document.getElementById('sort-' + c);
     if (el) el.textContent = '⇅';
   });
+  _updateBulkBarMode(false);
   filterSources();
 }
 
@@ -2448,10 +2516,11 @@ function renderSources(list) {
 
   // Update counter
   const counter = document.getElementById('src-counter');
-  const total   = sources.length;
-  const shown   = list.length;
-  counter.textContent = shown === total ? `${total} hashes` : `${shown} / ${total}`;
-  counter.className   = shown < total ? 'badge badge-yellow' : 'badge badge-gray';
+  const isDelView = document.getElementById('src-f-test').value === 'deleted';
+  const base  = sources.filter(s => isDelView ? s.deleted : !s.deleted).length;
+  const shown = list.length;
+  counter.textContent = shown === base ? `${base} hashes` : `${shown} / ${base}`;
+  counter.className   = shown < base ? 'badge badge-yellow' : 'badge badge-gray';
 
   if (!list.length) {
     const msg = total === 0
@@ -2489,19 +2558,25 @@ function renderSources(list) {
         ? `<span class="badge badge-green">${esc(ch.name)}</span>`
         : `<span class="badge badge-gray">sin vincular</span>`}</td>
       <td>${groupsHtml}</td>
-      <td>${s.active
-        ? '<span class="badge badge-green">Activo</span>'
-        : '<span class="badge badge-gray">Inactivo</span>'}</td>
+      <td>${s.deleted
+        ? '<span class="badge badge-red">Eliminado</span>'
+        : s.active
+          ? '<span class="badge badge-green">Activo</span>'
+          : '<span class="badge badge-gray">Inactivo</span>'}</td>
       <td>${testBadge(s)}</td>
       <td>${feedLabel
         ? `<span class="badge badge-blue" title="${esc(feed.url)}" style="font-size:.65rem;max-width:90px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap">${esc(feedLabel)}</span>`
         : '<span style="color:var(--text-dim);font-size:.75rem">—</span>'}</td>
       <td style="white-space:nowrap">
         <div style="display:inline-flex;gap:.4rem;align-items:center">
+          ${s.deleted ? `
+          <button class="btn btn-ghost btn-sm" onclick="restoreSource(${s.id})" title="Restaurar hash">↺ Restaurar</button>
+          ` : `
           <button class="btn btn-accent btn-sm" onclick="openMapModal(${s.id}, '${s.ace_hash}')">Vincular</button>
           <button class="btn btn-ghost btn-sm" id="test-btn-${s.id}" onclick="testSource(${s.id})">Test</button>
           <button class="btn btn-ghost btn-sm" onclick="openPlayModal(${s.id}, '${s.ace_hash}')">Play</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSource(${s.id})" title="Eliminar">×</button>
+          `}
         </div>
       </td>
     </tr>`;

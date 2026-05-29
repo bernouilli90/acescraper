@@ -144,7 +144,7 @@ async def channel_guide(channel_id: int, db: AsyncSession = Depends(get_db)):
     if not ch:
         raise HTTPException(status_code=404, detail="Canal no encontrado")
 
-    active_sources = [s for s in ch.sources if s.active and s.test_status == "ok"]
+    active_sources = [s for s in ch.sources if s.active and s.test_status == "ok" and not s.deleted]
     schedule = await asyncio.to_thread(_channel_schedule, ch.tvg_id)
 
     return {
@@ -191,6 +191,7 @@ async def channel_detail(channel_id: int, db: AsyncSession = Depends(get_db)):
                 "fail_since":   s.fail_since.isoformat() if s.fail_since else None,
             }
             for s in sorted(ch.sources, key=lambda s: (not s.active, s.test_status != "ok", s.id))
+            if not s.deleted
         ],
         "schedule": schedule,
     }
