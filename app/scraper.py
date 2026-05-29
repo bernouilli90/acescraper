@@ -180,13 +180,13 @@ async def _run_stream_tests(statuses: list[str]):
             test_progress["current_hash"] = ace_hash[:12]
             test_progress["current_label"] = display
             ok = await test_stream(ace_hash, ip, port)
-            status = "ok" if ok else "fail"
+            raw_status = "ok" if ok else "fail"
+            async with AsyncSessionLocal() as db:
+                final_status = await crud.update_source_test_result(db, source_id, raw_status)
             test_progress["recent"] = (
-                [{"hash": ace_hash[:12], "label": display, "status": status}]
+                [{"hash": ace_hash[:12], "label": display, "status": final_status}]
                 + test_progress["recent"]
             )[:5]
-            async with AsyncSessionLocal() as db:
-                await crud.update_source_test_result(db, source_id, status)
             test_progress["current"] += 1
 
     try:

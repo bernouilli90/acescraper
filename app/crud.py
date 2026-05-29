@@ -196,25 +196,25 @@ async def delete_source(db: AsyncSession, source_id: int):
     await db.commit()
 
 
-async def update_source_test_result(db: AsyncSession, source_id: int, status: str):
+async def update_source_test_result(db: AsyncSession, source_id: int, status: str) -> str:
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     result = await db.execute(select(models.Source).where(models.Source.id == source_id))
     source = result.scalar_one_or_none()
     if not source:
-        return
-    prev = source.test_status
+        return status
     # a dead stream that still fails stays dead (not downgraded to fail)
-    if status == "fail" and prev == "dead":
+    if status == "fail" and source.test_status == "dead":
         status = "dead"
-    # track when continuous failure streak started
-    if status in ("fail", "dead") and prev not in ("fail", "dead"):
-        source.fail_since = now
-    elif status == "ok":
+    if status == "ok":
         source.fail_since = None
+    elif status in ("fail", "dead") and source.fail_since is None:
+        # Set fail_since on first failure, or fill NULL left by schema migration
+        source.fail_since = now
     source.test_status = status
     source.test_last_run = now
     await db.commit()
+    return status
 
 
 async def mark_long_failing_sources_dead(db: AsyncSession, threshold_hours: int) -> int:

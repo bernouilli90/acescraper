@@ -206,6 +206,6 @@ async def test_one(source_id: int, db: AsyncSession = Depends(get_db)):
     ip = cfg.get("acexy_ip", "127.0.0.1")
     port = int(cfg.get("acexy_port", "6878"))
     ok = await scraper.test_stream(source.ace_hash, ip, port)
-    status = "ok" if ok else "fail"
-    await crud.update_source_test_result(db, source_id, status)
-    return schemas.StreamTestResult(source_id=source_id, status=status)
+    raw_status = "ok" if ok else "fail"
+    final_status = await crud.update_source_test_result(db, source_id, raw_status)
+    return schemas.StreamTestResult(source_id=source_id, status=final_status)
