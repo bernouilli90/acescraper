@@ -1802,12 +1802,20 @@ async function api(method, path, body) {
 
 // ── Channels ──────────────────────────────────────────────────────────────────
 async function loadChannels() {
+  const scrollY = window.scrollY;
   channels = await api('GET', '/api/channels/');
-  renderChannels(channels);
   renderGroups();
   rebuildChannelFilter();
   rebuildXmltvFilter();
   filterSources();
+  filterChannels();
+  window.scrollTo(0, scrollY);
+}
+
+function _patchLocalChannel(updated) {
+  const idx = channels.findIndex(c => c.id === updated.id);
+  if (idx >= 0) channels[idx] = updated;
+  filterChannels();
 }
 
 function _effectiveLogo(ch) {
@@ -2047,14 +2055,15 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const r = await fetch(`/api/channels/${id}/logo`, { method: 'POST', body: fd });
       if (!r.ok) { const e = await r.json(); alert(e.detail || 'Error al subir el logo'); return; }
-      await loadChannels();
+      _patchLocalChannel(await r.json());
     } catch(e) { alert('Error al subir el logo'); }
   });
 });
 
 async function deleteChannelLogo(id) {
   await api('DELETE', `/api/channels/${id}/logo`);
-  await loadChannels();
+  const ch = channels.find(c => c.id === id);
+  if (ch) { ch.custom_logo = null; filterChannels(); }
 }
 
 function inlineEditName(channelId) {
@@ -2085,8 +2094,8 @@ function inlineEditName(channelId) {
     const newName = input.value.trim();
     if (newName && newName !== orig) {
       try {
-        await api('PATCH', `/api/channels/${channelId}`, { name: newName });
-        await loadChannels();
+        const updated = await api('PATCH', `/api/channels/${channelId}`, { name: newName });
+        _patchLocalChannel(updated);
       } catch(e) {
         alert(e.message);
         restore();
@@ -3086,9 +3095,9 @@ function openChannelGroupsModal(channelId) {
 async function submitChannelGroups() {
   const group_ids = [...document.querySelectorAll('#cg-checkboxes input:checked')].map(i => +i.value);
   try {
-    await api('PATCH', `/api/channels/${pendingChannelId}`, { group_ids });
+    const updated = await api('PATCH', `/api/channels/${pendingChannelId}`, { group_ids });
     closeModal('modal-channel-groups');
-    await loadChannels();
+    _patchLocalChannel(updated);
     renderGroups();
   } catch(e) { alert(e.message); }
 }
@@ -3203,11 +3212,11 @@ async function addChannelToGroup(channelId) {
   if (!ch) return;
   const group_ids = [...new Set([...ch.groups.map(g => g.id), pendingGroupId])];
   try {
-    await api('PATCH', `/api/channels/${channelId}`, { group_ids });
+    const updated = await api('PATCH', `/api/channels/${channelId}`, { group_ids });
     // Persist the new channel at the end of the current order
     const newOrder = [...gcCurrentChannels.map(c => c.id), channelId];
     await api('PUT', `/api/groups/${pendingGroupId}/channel-order`, { channel_ids: newOrder });
-    await loadChannels();
+    _patchLocalChannel(updated);
     await _loadGcCurrentChannels();
     renderGcSearchResults(document.getElementById('gc-search').value.trim().toLowerCase());
     renderGroups();
@@ -3219,8 +3228,8 @@ async function removeChannelFromGroup(channelId) {
   if (!ch) return;
   const group_ids = ch.groups.map(g => g.id).filter(id => id !== pendingGroupId);
   try {
-    await api('PATCH', `/api/channels/${channelId}`, { group_ids });
-    await loadChannels();
+    const updated = await api('PATCH', `/api/channels/${channelId}`, { group_ids });
+    _patchLocalChannel(updated);
     await _loadGcCurrentChannels();
     renderGcSearchResults(document.getElementById('gc-search').value.trim().toLowerCase());
     renderGroups();
