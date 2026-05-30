@@ -484,6 +484,42 @@ async def import_xmltv_channels(db: AsyncSession, channels: list[dict], xmltv_id
     return {"created": created, "updated": updated, "total": created + updated}
 
 
+async def bulk_import_channels(db: AsyncSession, channels: list[dict]) -> dict:
+    """Create or update channels from a parsed XMLTV file (no xmltv_id link).
+
+    Batches SELECT queries at 500 ids to stay within SQLite's parameter limit.
+    """
+    if not channels:
+        return {"created": 0, "updated": 0, "total": 0}
+
+    all_tvg_ids = [ch["tvg_id"] for ch in channels]
+    existing_by_tvg: dict[str, models.Channel] = {}
+    BATCH = 500
+    for i in range(0, len(all_tvg_ids), BATCH):
+        res = await db.execute(
+            select(models.Channel).where(models.Channel.tvg_id.in_(all_tvg_ids[i:i + BATCH]))
+        )
+        for ch in res.scalars().all():
+            existing_by_tvg[ch.tvg_id] = ch
+
+    created = updated = 0
+    for ch in channels:
+        existing = existing_by_tvg.get(ch["tvg_id"])
+        if existing:
+            existing.name = ch["name"]
+            if ch.get("logo"):
+                existing.logo = ch["logo"]
+            updated += 1
+        else:
+            new_ch = models.Channel(tvg_id=ch["tvg_id"], name=ch["name"], logo=ch.get("logo"))
+            db.add(new_ch)
+            existing_by_tvg[ch["tvg_id"]] = new_ch
+            created += 1
+
+    await db.commit()
+    return {"created": created, "updated": updated, "total": created + updated}
+
+
 # ── Config ────────────────────────────────────────────────────────────────────
 
 async def get_config(db: AsyncSession) -> dict:

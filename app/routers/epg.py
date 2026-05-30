@@ -1,7 +1,6 @@
 import os
 from datetime import datetime, timezone
 
-import aiofiles
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -46,11 +45,8 @@ async def _epg_task():
         xmltv_urls_obj = await crud.get_xmltv_urls(db)
         urls = [x.url for x in xmltv_urls_obj]
 
-    xml_bytes, ch_count, prog_count = await scraper.generate_epg(tvg_ids, days, urls)
-
     os.makedirs(os.path.dirname(EPG_FILE), exist_ok=True)
-    async with aiofiles.open(EPG_FILE, "wb") as f:
-        await f.write(xml_bytes)
+    ch_count, prog_count = await scraper.generate_epg(tvg_ids, days, urls, EPG_FILE)
 
     async with AsyncSessionLocal() as db:
         now = datetime.now(timezone.utc).isoformat()

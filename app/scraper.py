@@ -1,10 +1,13 @@
 import asyncio
 import gzip
 import io
+import os
 import re
+import tempfile
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+import aiofiles
 import httpx
 from lxml import etree
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,16 +71,23 @@ async def fetch_and_extract(url: str) -> list[str]:
     return [e['ace_hash'] for e in await fetch_and_parse(url)]
 
 
-def parse_xmltv(content: bytes) -> list[dict]:
+def parse_xmltv(source) -> list[dict]:
     """Return list of {tvg_id, name, logo} from XMLTV data.
 
-    Uses iterparse + on-demand gzip to avoid loading the full DOM into memory.
+    source can be bytes/bytearray OR any seekable binary file-like object.
+    Uses iterparse so the XML DOM is never loaded into memory; when a file-like
+    is passed no extra BytesIO copy is created.
     """
     channels = []
     try:
-        buf = io.BytesIO(content)
-        source = gzip.GzipFile(fileobj=buf) if content[:2] == b'\x1f\x8b' else buf
-        for _, ch in etree.iterparse(source, events=("end",), tag="channel", recover=True):
+        if isinstance(source, (bytes, bytearray)):
+            buf = io.BytesIO(source)
+            src = gzip.GzipFile(fileobj=buf) if source[:2] == b'\x1f\x8b' else buf
+        else:
+            magic = source.read(2)
+            source.seek(0)
+            src = gzip.GzipFile(fileobj=source) if magic == b'\x1f\x8b' else source
+        for _, ch in etree.iterparse(src, events=("end",), tag="channel", recover=True):
             tvg_id = ch.get("id", "").strip()
             if tvg_id:
                 name_el = ch.find("display-name")
@@ -95,10 +105,24 @@ def parse_xmltv(content: bytes) -> list[dict]:
 
 
 async def fetch_xmltv(url: str) -> list[dict]:
-    async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-    return parse_xmltv(resp.content)
+    """Stream download to a temp file on disk, then parse — avoids loading the
+    full response into RAM (old approach: resp.content = full bytes in memory)."""
+    fd, tmp_path = tempfile.mkstemp(suffix='.xmltv')
+    os.close(fd)
+    try:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+            async with client.stream("GET", url) as resp:
+                resp.raise_for_status()
+                async with aiofiles.open(tmp_path, 'wb') as f:
+                    async for chunk in resp.aiter_bytes(65536):
+                        await f.write(chunk)
+        with open(tmp_path, 'rb') as f:
+            return await asyncio.to_thread(parse_xmltv, f)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 # ── Scheduled refresh ─────────────────────────────────────────────────────────
@@ -221,63 +245,137 @@ def _parse_xmltv_dt(s: str) -> Optional[datetime]:
         return None
 
 
-async def generate_epg(tvg_ids: set[str], days: int, xmltv_urls: list[str]) -> tuple[bytes, int, int]:
+def _parse_url_to_files(
+    src_path: str,
+    tvg_ids: set[str],
+    now: datetime,
+    cutoff: datetime,
+    past_cutoff: datetime,
+    channels_xml: dict,
+    prog_path: str,
+) -> int:
+    """Synchronous (runs in thread pool): parse one XMLTV source file.
+
+    Channels are collected into channels_xml dict (small, bounded by tvg_ids count).
+    Programmes are written directly to prog_path to avoid accumulating a huge list in RAM.
+    Returns the number of programme entries written.
+    """
+    prog_count = 0
+    try:
+        with open(src_path, 'rb') as src_f:
+            magic = src_f.read(2)
+            src_f.seek(0)
+            source = gzip.GzipFile(fileobj=src_f) if magic == b'\x1f\x8b' else src_f
+            with open(prog_path, 'ab') as prog_f:
+                for _, elem in etree.iterparse(
+                    source, events=("end",), tag=("channel", "programme"), recover=True
+                ):
+                    if elem.tag == "channel":
+                        cid = elem.get("id", "")
+                        if cid in tvg_ids and cid not in channels_xml:
+                            channels_xml[cid] = etree.tostring(elem, encoding="unicode").encode("utf-8")
+                    elif elem.tag == "programme":
+                        if elem.get("channel", "") in tvg_ids:
+                            start = _parse_xmltv_dt(elem.get("start", ""))
+                            if start is not None and start <= cutoff:
+                                stop = _parse_xmltv_dt(elem.get("stop", ""))
+                                if stop is None or stop >= past_cutoff:
+                                    prog_f.write(
+                                        etree.tostring(elem, encoding="unicode").encode("utf-8") + b"\n"
+                                    )
+                                    prog_count += 1
+                    parent = elem.getparent()
+                    elem.clear()
+                    if parent is not None:
+                        parent.remove(elem)
+    except Exception:
+        pass
+    return prog_count
+
+
+def _write_epg_file(out_path: str, channels_xml: dict, prog_path: str) -> None:
+    """Synchronous (runs in thread pool): assemble final EPG XML without holding it in RAM.
+
+    Writes to out_path directly, streaming the programmes temp file chunk by chunk.
+    """
+    with open(out_path, 'wb') as out:
+        out.write(b'<?xml version="1.0" encoding="UTF-8"?>\n<tv generator-info-name="AceScraper">\n')
+        for ch_bytes in channels_xml.values():
+            out.write(ch_bytes)
+            out.write(b"\n")
+        with open(prog_path, 'rb') as prog_f:
+            while True:
+                chunk = prog_f.read(65536)
+                if not chunk:
+                    break
+                out.write(chunk)
+        out.write(b"\n</tv>\n")
+
+
+async def generate_epg(tvg_ids: set[str], days: int, xmltv_urls: list[str], out_path: str) -> tuple[int, int]:
     """
     Fetch XMLTV URLs, filter to tvg_ids and [now, now+days] window.
-    Returns (xml_bytes, channel_count, programme_count).
+    Writes the result directly to out_path (atomic rename from a .tmp file).
+    Returns (channel_count, programme_count).
 
-    Uses streaming HTTP download + iterparse to avoid loading multi-GB DOMs into memory.
+    Memory strategy:
+    - Each URL is streamed to a disk temp file (no BytesIO = no RAM spike per URL).
+    - channels_xml dict is kept in memory but is small (bounded by len(tvg_ids)).
+    - Programmes are written directly to a disk temp file as they are parsed —
+      never accumulated in a Python list.
+    - Final XML is assembled on disk by streaming the programmes temp file.
     """
     now = datetime.now(timezone.utc)
     cutoff = now + timedelta(days=days)
-    past_cutoff = now - timedelta(hours=1)  # include currently-airing programmes
+    past_cutoff = now - timedelta(hours=1)
 
-    channels_xml: dict[str, bytes] = {}   # tvg_id → serialized <channel> element
-    programmes_xml: list[bytes] = []
+    channels_xml: dict[str, bytes] = {}
+    prog_count = 0
 
-    for url in xmltv_urls:
+    fd, prog_tmp = tempfile.mkstemp(suffix='.epg_progs')
+    os.close(fd)
+
+    try:
+        for url in xmltv_urls:
+            fd2, src_tmp = tempfile.mkstemp(suffix='.xmltv_src')
+            os.close(fd2)
+            try:
+                async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+                    async with client.stream("GET", url) as resp:
+                        resp.raise_for_status()
+                        async with aiofiles.open(src_tmp, 'wb') as f:
+                            async for chunk in resp.aiter_bytes(65536):
+                                await f.write(chunk)
+                prog_count += await asyncio.to_thread(
+                    _parse_url_to_files,
+                    src_tmp, tvg_ids, now, cutoff, past_cutoff,
+                    channels_xml, prog_tmp,
+                )
+            except Exception:
+                pass
+            finally:
+                try:
+                    os.unlink(src_tmp)
+                except OSError:
+                    pass
+
+        out_tmp = out_path + '.tmp'
         try:
-            # Stream download into a single buffer (avoids holding full content + decompressed copy)
-            buf = io.BytesIO()
-            async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
-                async with client.stream("GET", url) as resp:
-                    resp.raise_for_status()
-                    async for chunk in resp.aiter_bytes(65536):
-                        buf.write(chunk)
-            buf.seek(0)
-
-            # Wrap with on-demand gzip decompressor if needed (no full-decompress copy)
-            magic = buf.read(2)
-            buf.seek(0)
-            source = gzip.GzipFile(fileobj=buf) if magic == b"\x1f\x8b" else buf
-
-            # Stream-parse: never loads the full DOM into memory
-            for _, elem in etree.iterparse(source, events=("end",), tag=("channel", "programme"), recover=True):
-                if elem.tag == "channel":
-                    cid = elem.get("id", "")
-                    if cid in tvg_ids and cid not in channels_xml:
-                        channels_xml[cid] = etree.tostring(elem, encoding="unicode").encode("utf-8")
-                elif elem.tag == "programme":
-                    if elem.get("channel", "") in tvg_ids:
-                        start = _parse_xmltv_dt(elem.get("start", ""))
-                        if start is not None and start <= cutoff:
-                            stop = _parse_xmltv_dt(elem.get("stop", ""))
-                            if stop is None or stop >= past_cutoff:
-                                programmes_xml.append(
-                                    etree.tostring(elem, encoding="unicode").encode("utf-8")
-                                )
-                # Free element and remove from parent to prevent DOM accumulation
-                parent = elem.getparent()
-                elem.clear()
-                if parent is not None:
-                    parent.remove(elem)
+            await asyncio.to_thread(_write_epg_file, out_tmp, channels_xml, prog_tmp)
+            os.replace(out_tmp, out_path)
         except Exception:
-            continue
+            try:
+                os.unlink(out_tmp)
+            except OSError:
+                pass
+            raise
+    finally:
+        try:
+            os.unlink(prog_tmp)
+        except OSError:
+            pass
 
-    header = b'<?xml version="1.0" encoding="UTF-8"?>\n<tv generator-info-name="AceScraper">\n'
-    body = b"\n".join(channels_xml.values()) + b"\n" + b"\n".join(programmes_xml)
-    xml_bytes = header + body + b"\n</tv>\n"
-    return xml_bytes, len(channels_xml), len(programmes_xml)
+    return len(channels_xml), prog_count
 
 
 async def refresh_all_xmltv(_db: AsyncSession):
