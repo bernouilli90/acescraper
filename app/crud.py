@@ -79,11 +79,14 @@ async def delete_channel(db: AsyncSession, channel_id: int):
     await db.commit()
 
 
-async def set_channel_logo(db: AsyncSession, channel_id: int, filename: Optional[str]):
+async def set_channel_logo(db: AsyncSession, channel_id: int, filename: Optional[str], clear_logo_url: bool = False):
+    values: dict = {"custom_logo": filename}
+    if clear_logo_url:
+        values["logo"] = None
     await db.execute(
         update(models.Channel)
         .where(models.Channel.id == channel_id)
-        .values(custom_logo=filename)
+        .values(**values)
     )
     await db.commit()
 

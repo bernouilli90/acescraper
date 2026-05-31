@@ -82,7 +82,7 @@ async def delete_logo(channel_id: int, db: AsyncSession = Depends(get_db)):
         if os.path.exists(path):
             os.remove(path)
 
-    await crud.set_channel_logo(db, channel_id, None)
+    await crud.set_channel_logo(db, channel_id, None, clear_logo_url=True)
 
 
 @router.get("/{channel_id}", response_model=schemas.ChannelOut)

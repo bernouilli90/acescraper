@@ -1859,7 +1859,7 @@ function renderChannels(list) {
       <td style="text-align:center"><span class="badge ${ch.source_count ? 'badge-green' : 'badge-gray'}">${ch.source_count}</span></td>
       <td>
         <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap">
-          ${ch.custom_logo ? `<button class="btn btn-ghost btn-sm" onclick="deleteChannelLogo(${ch.id})" title="Eliminar logo personalizado (vuelve al XMLTV)">✕ Logo</button>` : ''}
+          ${(ch.custom_logo || ch.logo) ? `<button class="btn btn-ghost btn-sm" onclick="deleteChannelLogo(${ch.id})" title="Eliminar logo">✕ Logo</button>` : ''}
           <button class="btn btn-danger btn-sm" onclick="deleteChannel(${ch.id})">Eliminar</button>
         </div>
       </td>
@@ -2063,7 +2063,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function deleteChannelLogo(id) {
   await api('DELETE', `/api/channels/${id}/logo`);
   const ch = channels.find(c => c.id === id);
-  if (ch) { ch.custom_logo = null; filterChannels(); }
+  if (ch) { ch.custom_logo = null; ch.logo = null; filterChannels(); }
 }
 
 function inlineEditName(channelId) {
