@@ -600,7 +600,7 @@
   <!-- Search -->
   <div class="card">
     <div class="card-body" style="padding:.75rem 1rem">
-      <div class="ch-filter-grid" style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:.6rem;align-items:end">
+      <div class="ch-filter-grid" style="display:grid;grid-template-columns:1fr auto auto auto auto auto;gap:.6rem;align-items:end">
         <div>
           <label class="field-label" style="margin-bottom:.3rem">Buscar</label>
           <input id="ch-search" type="search" placeholder="Nombre o tvg-id…"
@@ -628,6 +628,14 @@
             <option value="xmltv">Solo XMLTV</option>
             <option value="any">Con cualquier logo</option>
             <option value="none">Sin logo</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label" style="margin-bottom:.3rem">Grupos</label>
+          <select id="ch-f-group" onchange="filterChannels()" style="height:36px;padding:.35rem .7rem;width:auto">
+            <option value="">Todos</option>
+            <option value="with">Con grupo</option>
+            <option value="without">Sin grupo</option>
           </select>
         </div>
         <div style="padding-bottom:1px">
@@ -1888,6 +1896,7 @@ function filterChannels() {
   const xmltvId = document.getElementById('ch-f-xmltv').value;
   const hashes  = document.getElementById('ch-f-hashes').value;
   const logo    = document.getElementById('ch-f-logo').value;
+  const group   = document.getElementById('ch-f-group').value;
   renderChannels(channels.filter(c => {
     if (q && !c.name.toLowerCase().includes(q) && !c.tvg_id.toLowerCase().includes(q)) return false;
     if (xmltvId && !(c.xmltv_ids || []).some(id => String(id) === xmltvId)) return false;
@@ -1897,6 +1906,8 @@ function filterChannels() {
     if (logo === 'xmltv'  && (c.custom_logo || !c.logo)) return false;
     if (logo === 'any'    && !c.custom_logo && !c.logo) return false;
     if (logo === 'none'   && (c.custom_logo || c.logo)) return false;
+    if (group === 'with'    && (c.groups || []).length === 0) return false;
+    if (group === 'without' && (c.groups || []).length > 0)   return false;
     return true;
   }));
 }
@@ -1906,6 +1917,7 @@ function clearChannelFilters() {
   document.getElementById('ch-f-xmltv').value  = '';
   document.getElementById('ch-f-hashes').value = '';
   document.getElementById('ch-f-logo').value   = '';
+  document.getElementById('ch-f-group').value  = '';
   filterChannels();
 }
 
