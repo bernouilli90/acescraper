@@ -568,6 +568,7 @@
     <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
   </svg>
   <span style="font-size:1rem;font-weight:700;color:var(--text)">AceScraper</span>
+  <span id="app-version" style="font-size:.7rem;color:var(--text-muted);font-family:monospace;opacity:.7"></span>
   <nav class="nav-links">
     <a href="/list/native" target="_blank" class="export"><span class="nav-long">↓ M3U Native</span><span class="nav-short">↓ Native</span></a>
     <a href="/list/proxy"  target="_blank" class="export"><span class="nav-long">↓ M3U Proxy</span><span class="nav-short">↓ Proxy</span></a>
@@ -1033,7 +1034,7 @@
           <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Auto-marcar muertos</p>
           <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;margin-bottom:.6rem">
             <div style="position:relative;display:inline-block;width:40px;height:22px">
-              <input type="checkbox" id="stest-autodeact-enabled" onchange="streamTestMarkDirty()" style="opacity:0;width:0;height:0;position:absolute"/>
+              <input type="checkbox" id="stest-autodeact-enabled" onchange="autodeactToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
               <span id="stest-autodeact-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
               <span id="stest-autodeact-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
             </div>
@@ -3351,6 +3352,13 @@ function streamTestToggle() {
   streamTestMarkDirty();
 }
 
+function autodeactToggle() {
+  const on = document.getElementById('stest-autodeact-enabled').checked;
+  document.getElementById('stest-autodeact-track').style.background = on ? 'var(--accent)' : 'var(--border2)';
+  document.getElementById('stest-autodeact-thumb').style.left = on ? '21px' : '3px';
+  streamTestMarkDirty();
+}
+
 function streamTestMarkDirty() {
   stestDirty = true;
   document.getElementById('stest-save-btn').disabled = false;
@@ -3764,6 +3772,9 @@ function _spRenderFeeds(f) {
 async function spPoll() {
   try {
     const s = await api('GET', '/api/status');
+    const vEl = document.getElementById('app-version');
+    if (vEl && !vEl.textContent && s.version) vEl.textContent = 'v' + s.version;
+
     const anyRunning = s.stream_test.running || s.feeds.running;
 
     // Auto-expand when a new task starts

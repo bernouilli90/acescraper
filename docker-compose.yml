@@ -47,7 +47,10 @@ services:
       retries: 3
 
   acescraper:
-    build: .
+    build:
+      context: .
+      args:
+        APP_VERSION: "${APP_VERSION:-dev}"
     container_name: acescraper
     restart: unless-stopped
     ports:

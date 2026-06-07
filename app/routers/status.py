@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from app.version import APP_VERSION
 
 router = APIRouter(prefix="/api/status", tags=["status"])
 
@@ -9,6 +10,7 @@ async def get_status():
     from app.routers.watchdog import _state as wd_state
 
     return {
+        "version": APP_VERSION,
         "stream_test": {
             "running":       test_progress["running"],
             "current":       test_progress["current"],

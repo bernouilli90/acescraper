@@ -29,7 +29,9 @@ RUN mkdir -p /data && chown appuser:appuser /data
 
 USER appuser
 
+ARG APP_VERSION=dev
 ENV DATABASE_URL=sqlite+aiosqlite:////data/acescraper.db \
+    APP_VERSION=$APP_VERSION \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
