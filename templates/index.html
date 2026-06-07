@@ -1828,7 +1828,7 @@ function _patchLocalChannel(updated) {
 }
 
 function _effectiveLogo(ch) {
-  if (ch.custom_logo) return '/static/logos/' + ch.custom_logo;
+  if (ch.custom_logo) return '/static/logos/' + ch.custom_logo + (ch._logo_v ? '?v=' + ch._logo_v : '');
   return ch.logo || null;
 }
 
@@ -2068,7 +2068,9 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const r = await fetch(`/api/channels/${id}/logo`, { method: 'POST', body: fd });
       if (!r.ok) { const e = await r.json(); alert(e.detail || 'Error al subir el logo'); return; }
-      _patchLocalChannel(await r.json());
+      const updated = await r.json();
+      if (updated.custom_logo) updated._logo_v = Date.now();
+      _patchLocalChannel(updated);
     } catch(e) { alert('Error al subir el logo'); }
   });
 });
