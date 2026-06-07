@@ -1,11 +1,13 @@
 import asyncio
 import glob
+import json
 import os
+import shutil
 from datetime import datetime, timezone, timedelta
 from lxml import etree
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -41,6 +43,58 @@ async def create_channel(data: schemas.ChannelCreate, db: AsyncSession = Depends
     if existing:
         raise HTTPException(status_code=409, detail="tvg_id already exists")
     return await crud.create_channel(db, data)
+
+
+@router.post("/bulk-logo", response_model=list[schemas.ChannelOut])
+async def bulk_upload_logo(
+    ids: str = Form(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    channel_ids: list[int] = json.loads(ids)
+    if not channel_ids:
+        return []
+
+    ct = (file.content_type or "").split(";")[0].strip()
+    if ct not in _ALLOWED_TYPES:
+        raise HTTPException(status_code=400, detail=f"Tipo no soportado: {ct}")
+
+    ext = _EXT_MAP.get(ct, ".jpg")
+    data = await file.read()
+    os.makedirs(LOGOS_DIR, exist_ok=True)
+
+    for ch_id in channel_ids:
+        for old in glob.glob(os.path.join(LOGOS_DIR, f"channel_{ch_id}.*")):
+            os.remove(old)
+        filename = f"channel_{ch_id}{ext}"
+        async with aiofiles.open(os.path.join(LOGOS_DIR, filename), "wb") as f:
+            await f.write(data)
+        await crud.set_channel_logo(db, ch_id, filename)
+
+    return [ch for ch_id in channel_ids if (ch := await crud.get_channel(db, ch_id))]
+
+
+@router.delete("/bulk-logo", status_code=status.HTTP_204_NO_CONTENT)
+async def bulk_delete_logo(data: schemas.BulkChannelLogoDelete, db: AsyncSession = Depends(get_db)):
+    for ch_id in data.ids:
+        ch = await crud.get_channel(db, ch_id)
+        if not ch:
+            continue
+        if ch.custom_logo:
+            path = os.path.join(LOGOS_DIR, ch.custom_logo)
+            if os.path.exists(path):
+                os.remove(path)
+        await crud.set_channel_logo(db, ch_id, None, clear_logo_url=True)
+
+
+@router.patch("/bulk-groups")
+async def bulk_update_groups(data: schemas.BulkChannelGroupsUpdate, db: AsyncSession = Depends(get_db)):
+    updated = []
+    for ch_id in data.ids:
+        ch = await crud.update_channel(db, ch_id, schemas.ChannelUpdate(group_ids=data.group_ids))
+        if ch:
+            updated.append(ch)
+    return updated
 
 
 @router.post("/{channel_id}/logo", response_model=schemas.ChannelOut)

@@ -595,8 +595,18 @@
 
   <div class="section-header">
     <h2 class="section-title">Canales</h2>
-    <button class="btn btn-primary" onclick="openAddChannelModal()">+ Añadir Canal</button>
+    <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+      <div id="ch-bulk-bar" style="display:none;align-items:center;gap:.5rem">
+        <span id="ch-bulk-count" style="font-size:.8rem;color:var(--text-muted)"></span>
+        <button class="btn btn-accent btn-sm" onclick="bulkChUploadLogo()">↑ Logo</button>
+        <button class="btn btn-ghost btn-sm" onclick="bulkChDeleteLogo()">✕ Logo</button>
+        <button class="btn btn-ghost btn-sm" onclick="openBulkChGroupsModal()">Grupos</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearChannelSelection()">Deseleccionar</button>
+      </div>
+      <button class="btn btn-primary" onclick="openAddChannelModal()">+ Añadir Canal</button>
+    </div>
   </div>
+  <input type="file" id="ch-bulk-logo-input" accept="image/*" style="display:none"/>
 
   <!-- Search -->
   <div class="card">
@@ -653,6 +663,9 @@
       <table>
         <thead>
           <tr>
+            <th style="width:28px;padding:.5rem .4rem">
+              <input type="checkbox" id="ch-select-all" onchange="toggleSelectAllChannels(this.checked)" title="Seleccionar todos"/>
+            </th>
             <th style="width:52px">Logo</th>
             <th>Nombre</th>
             <th>tvg-id</th>
@@ -662,7 +675,7 @@
           </tr>
         </thead>
         <tbody id="channels-tbody">
-          <tr class="empty-row"><td colspan="6">Cargando…</td></tr>
+          <tr class="empty-row"><td colspan="7">Cargando…</td></tr>
         </tbody>
       </table>
     </div>
@@ -1406,6 +1419,24 @@
   </div>
 </div>
 
+<!-- Bulk channel groups modal -->
+<div id="modal-bulk-ch-groups" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Grupos — <span id="bcg-title" style="color:var(--accent)"></span></h3>
+      <button class="modal-close" onclick="closeModal('modal-bulk-ch-groups')">&times;</button>
+    </div>
+    <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.75rem">
+      Los grupos seleccionados reemplazarán los grupos actuales de todos los canales seleccionados.
+    </p>
+    <div id="bcg-checkboxes" style="display:flex;flex-wrap:wrap;gap:.5rem"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-bulk-ch-groups')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitBulkChGroups()">Aplicar a todos</button>
+    </div>
+  </div>
+</div>
+
 <!-- Group guide (channels with active streams + EPG) -->
 <div id="modal-group-guide" class="modal-overlay">
   <div class="modal-box" style="max-width:640px">
@@ -1813,11 +1844,16 @@ async function api(method, path, body) {
 async function loadChannels() {
   const scrollY = window.scrollY;
   channels = await api('GET', '/api/channels/');
+  const existing = new Set(channels.map(c => c.id));
+  for (const id of selectedChannels) {
+    if (!existing.has(id)) selectedChannels.delete(id);
+  }
   renderGroups();
   rebuildChannelFilter();
   rebuildXmltvFilter();
   filterSources();
   filterChannels();
+  _updateChBulkBar();
   window.scrollTo(0, scrollY);
 }
 
@@ -1835,16 +1871,20 @@ function _effectiveLogo(ch) {
 function renderChannels(list) {
   const tbody = document.getElementById('channels-tbody');
   if (!list.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Sin canales. Importa un XMLTV o crea uno manualmente.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Sin canales. Importa un XMLTV o crea uno manualmente.</td></tr>';
     return;
   }
   tbody.innerHTML = list.map(ch => {
+    const sel = selectedChannels.has(ch.id);
     const logoSrc = _effectiveLogo(ch);
     const logoImg = logoSrc
       ? `<img src="${esc(logoSrc)}" style="width:36px;height:36px;border-radius:4px;object-fit:contain;background:var(--surface2)" onerror="this.src='';this.style.display='none'">`
       : `<div style="width:36px;height:36px;border-radius:4px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:var(--text-dim)">IMG</div>`;
     return `
-    <tr>
+    <tr id="ch-row-${ch.id}" class="${sel ? 'row-selected' : ''}">
+      <td style="width:28px;padding:.5rem .4rem">
+        <input type="checkbox" ${sel ? 'checked' : ''} onchange="toggleChannelSelection(${ch.id}, this.checked)"/>
+      </td>
       <td style="width:52px">
         <div onclick="triggerLogoUpload(${ch.id})" title="Subir logo personalizado" style="cursor:pointer;display:inline-block">
           ${logoImg}
@@ -2081,6 +2121,112 @@ async function deleteChannelLogo(id) {
   if (ch) { ch.custom_logo = null; ch.logo = null; filterChannels(); }
 }
 
+// ── Channel bulk selection ────────────────────────────────────────────────────
+
+function toggleChannelSelection(id, checked) {
+  checked ? selectedChannels.add(id) : selectedChannels.delete(id);
+  const row = document.getElementById('ch-row-' + id);
+  if (row) row.classList.toggle('row-selected', checked);
+  _updateChBulkBar();
+}
+
+function toggleSelectAllChannels(checked) {
+  document.querySelectorAll('#channels-tbody input[type=checkbox]').forEach(cb => {
+    const id = +cb.closest('tr').id.replace('ch-row-', '');
+    cb.checked = checked;
+    checked ? selectedChannels.add(id) : selectedChannels.delete(id);
+    cb.closest('tr').classList.toggle('row-selected', checked);
+  });
+  _updateChBulkBar();
+}
+
+function clearChannelSelection() {
+  selectedChannels.clear();
+  document.querySelectorAll('#channels-tbody input[type=checkbox]').forEach(cb => cb.checked = false);
+  document.querySelectorAll('#channels-tbody tr.row-selected').forEach(r => r.classList.remove('row-selected'));
+  const all = document.getElementById('ch-select-all');
+  if (all) all.checked = false;
+  _updateChBulkBar();
+}
+
+function _updateChBulkBar() {
+  const n = selectedChannels.size;
+  const bar = document.getElementById('ch-bulk-bar');
+  bar.style.display = n ? 'flex' : 'none';
+  document.getElementById('ch-bulk-count').textContent = `${n} seleccionado${n !== 1 ? 's' : ''}`;
+  const all = document.getElementById('ch-select-all');
+  if (all) {
+    const visible = document.querySelectorAll('#channels-tbody input[type=checkbox]').length;
+    all.checked = visible > 0 && n >= visible;
+    all.indeterminate = n > 0 && n < visible;
+  }
+}
+
+function bulkChUploadLogo() {
+  if (!selectedChannels.size) return;
+  document.getElementById('ch-bulk-logo-input').click();
+}
+
+async function bulkChDeleteLogo() {
+  if (!selectedChannels.size) return;
+  const ids = [...selectedChannels];
+  try {
+    await api('DELETE', '/api/channels/bulk-logo', { ids });
+    ids.forEach(id => {
+      const ch = channels.find(c => c.id === id);
+      if (ch) { ch.custom_logo = null; ch.logo = null; }
+    });
+    filterChannels();
+  } catch(e) { alert(e.message); }
+}
+
+function openBulkChGroupsModal() {
+  if (!selectedChannels.size) return;
+  const n = selectedChannels.size;
+  document.getElementById('bcg-title').textContent = `${n} canal${n !== 1 ? 'es' : ''}`;
+  document.getElementById('bcg-checkboxes').innerHTML = groups.length
+    ? groups.map(g => `
+        <label style="display:flex;align-items:center;gap:.4rem;font-size:.85rem;cursor:pointer;
+                       padding:.35rem .65rem;background:var(--surface2);border:1px solid var(--border2);
+                       border-radius:6px;transition:border-color .15s"
+               onmouseenter="this.style.borderColor='var(--accent)'"
+               onmouseleave="this.style.borderColor='var(--border2)'">
+          <input type="checkbox" value="${g.id}"/>
+          ${esc(g.name)}
+        </label>`).join('')
+    : '<span style="font-size:.85rem;color:var(--text-dim)">No hay grupos creados todavía.</span>';
+  openModal('modal-bulk-ch-groups');
+}
+
+async function submitBulkChGroups() {
+  const ids = [...selectedChannels];
+  const group_ids = [...document.querySelectorAll('#bcg-checkboxes input:checked')].map(i => +i.value);
+  try {
+    const updated = await api('PATCH', '/api/channels/bulk-groups', { ids, group_ids });
+    updated.forEach(ch => _patchLocalChannel(ch));
+    closeModal('modal-bulk-ch-groups');
+    renderGroups();
+  } catch(e) { alert(e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('ch-bulk-logo-input').addEventListener('change', async function() {
+    if (!this.files[0] || !selectedChannels.size) return;
+    const ids = [...selectedChannels];
+    const fd = new FormData();
+    fd.append('file', this.files[0]);
+    fd.append('ids', JSON.stringify(ids));
+    this.value = '';
+    try {
+      const r = await fetch('/api/channels/bulk-logo', { method: 'POST', body: fd });
+      if (!r.ok) { const e = await r.json(); alert(e.detail || 'Error al subir el logo'); return; }
+      const updatedList = await r.json();
+      const v = Date.now();
+      updatedList.forEach(ch => { if (ch.custom_logo) ch._logo_v = v; _patchLocalChannel(ch); });
+    } catch(e) { alert('Error al subir el logo'); }
+  });
+});
+
 function inlineEditName(channelId) {
   const span = document.getElementById('ch-name-' + channelId);
   if (!span || span.dataset.editing) return;
@@ -2272,6 +2418,7 @@ function inlineEditLabel(sourceId) {
 
 // ── Sources ───────────────────────────────────────────────────────────────────
 let srcSort = { col: null, dir: 1 };  // dir: 1=asc, -1=desc
+let selectedChannels = new Set();     // ids of selected channel rows
 let selectedSources = new Set();      // ids of selected rows
 
 async function loadSources() {

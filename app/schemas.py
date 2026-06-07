@@ -133,6 +133,16 @@ class BulkAssignRequest(BaseModel):
     channel_id: Optional[int] = None
 
 
+# --- Bulk channel operations ---
+class BulkChannelLogoDelete(BaseModel):
+    ids: list[int]
+
+
+class BulkChannelGroupsUpdate(BaseModel):
+    ids: list[int]
+    group_ids: list[int]
+
+
 # --- Bulk import ---
 class BulkImportResult(BaseModel):
     new_hashes: int
