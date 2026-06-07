@@ -87,7 +87,7 @@ async def bulk_delete_logo(data: schemas.BulkChannelLogoDelete, db: AsyncSession
         await crud.set_channel_logo(db, ch_id, None, clear_logo_url=True)
 
 
-@router.patch("/bulk-groups")
+@router.patch("/bulk-groups", response_model=list[schemas.ChannelOut])
 async def bulk_update_groups(data: schemas.BulkChannelGroupsUpdate, db: AsyncSession = Depends(get_db)):
     updated = []
     for ch_id in data.ids:
