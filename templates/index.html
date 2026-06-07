@@ -1584,6 +1584,18 @@
         <div id="play-stream-list" style="display:none;border-top:1px solid var(--border);max-height:160px;overflow-y:auto"></div>
       </div>
 
+      <!-- Buffer selector -->
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span style="font-size:.72rem;color:var(--text-muted);flex-shrink:0">Buffer:</span>
+        <select id="play-buffer-select" onchange="_onBufferChange()"
+                style="font-size:.72rem;height:28px;padding:.1rem .5rem;flex:1">
+          <option value="0">Auto (sin buffer extra)</option>
+          <option value="3">Bajo · ~3 s</option>
+          <option value="8">Medio · ~8 s</option>
+          <option value="15">Alto · ~15 s</option>
+        </select>
+      </div>
+
       <!-- Proxy URL copy -->
       <div style="display:flex;gap:.4rem;align-items:center">
         <code id="play-proxy-url" style="flex:1;font-size:.68rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.35rem .5rem"></code>
@@ -3986,6 +3998,29 @@ function _buildProxyUrl(hash) {
 let _mpegtsPlayer   = null;
 let _playContext    = null;
 let _epgTimer       = null;
+let _bufferSeconds  = +localStorage.getItem('play_buffer_s') || 0;
+
+function _mpegtsConfig(bufSec) {
+  if (!bufSec) {
+    return { enableWorker: true, enableStashBuffer: true, stashInitialSize: 384,
+             liveBufferLatencyChasing: true,
+             liveBufferLatencyMaxLatency: 1.5, liveBufferLatencyMinRemain: 0.5 };
+  }
+  return {
+    enableWorker: true,
+    enableStashBuffer: true,
+    stashInitialSize: bufSec * 150,   // rough KB estimate
+    liveBufferLatencyChasing: true,
+    liveBufferLatencyMaxLatency: bufSec + 3,
+    liveBufferLatencyMinRemain: bufSec,
+  };
+}
+
+function _onBufferChange() {
+  _bufferSeconds = +document.getElementById('play-buffer-select').value;
+  localStorage.setItem('play_buffer_s', _bufferSeconds);
+  if (_playContext) _startStream(_playContext.hash);
+}
 let _overlayTimer   = null;
 
 // ── Overlay auto-hide ─────────────────────────────────────────────────────────
@@ -4104,6 +4139,7 @@ async function openPlayModal(sourceId, hash) {
   document.getElementById('play-overlay-stream-list').style.display = 'none';
   if (_overlayTimer) { clearTimeout(_overlayTimer); _overlayTimer = null; }
 
+  document.getElementById('play-buffer-select').value = String(_bufferSeconds);
   openModal('modal-play');
   _startStream(hash);
 
@@ -4141,7 +4177,10 @@ function _startStream(hash) {
   };
 
   if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
-    _mpegtsPlayer = mpegts.createPlayer({ type: 'mpegts', isLive: true, url: `/api/stream/${hash}` });
+    _mpegtsPlayer = mpegts.createPlayer(
+      { type: 'mpegts', isLive: true, url: `/api/stream/${hash}` },
+      _mpegtsConfig(_bufferSeconds)
+    );
     _mpegtsPlayer.attachMediaElement(video);
     _mpegtsPlayer.load();
     _mpegtsPlayer.play();
