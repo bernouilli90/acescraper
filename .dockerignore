@@ -22,3 +22,4 @@ data/
 # Docs / scripts not needed at runtime
 *.md
 run.sh
+build.sh
