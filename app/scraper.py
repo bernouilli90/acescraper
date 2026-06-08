@@ -227,7 +227,7 @@ async def _run_stream_tests(statuses: list[str]):
     if cfg.get("stream_test_auto_deactivate_enabled", "false") == "true":
         threshold = int(cfg.get("stream_test_auto_deactivate_hours", "48"))
         async with AsyncSessionLocal() as db:
-            await crud.mark_long_failing_sources_dead(db, threshold)
+            await crud.apply_dead_threshold(db, threshold)
 
 
 def _parse_xmltv_dt(s: str) -> Optional[datetime]:

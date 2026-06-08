@@ -147,6 +147,8 @@ async def update_config(
         "stream_test_auto_deactivate_enabled": str(data.auto_deactivate_enabled).lower(),
         "stream_test_auto_deactivate_hours": str(data.auto_deactivate_hours),
     })
+    if data.auto_deactivate_enabled:
+        await crud.apply_dead_threshold(db, data.auto_deactivate_hours)
     apply_test_config(_get_scheduler(request), data.interval_fail_minutes, data.interval_ok_minutes, data.enabled)
     return await get_config(request, db)
 

@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update
+from sqlalchemy import select, delete, update, or_
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import selectinload
 from typing import Optional
@@ -243,10 +243,16 @@ async def update_source_test_result(db: AsyncSession, source_id: int, status: st
     return status
 
 
-async def mark_long_failing_sources_dead(db: AsyncSession, threshold_hours: int) -> int:
+async def apply_dead_threshold(db: AsyncSession, threshold_hours: int) -> tuple[int, int]:
+    """Re-evaluate fail/dead classification of all sources against `threshold_hours`.
+
+    Marks long-failing sources as dead, and reverts dead sources whose fail_since
+    no longer meets the threshold (e.g. after the user raises the hours) back to fail.
+    Returns (marked_dead, revived) row counts.
+    """
     from datetime import datetime, timezone, timedelta
     cutoff = datetime.now(timezone.utc) - timedelta(hours=threshold_hours)
-    result = await db.execute(
+    dead_result = await db.execute(
         update(models.Source)
         .where(models.Source.active.is_(True))
         .where(models.Source.test_status == "fail")
@@ -254,8 +260,14 @@ async def mark_long_failing_sources_dead(db: AsyncSession, threshold_hours: int)
         .where(models.Source.fail_since <= cutoff)
         .values(test_status="dead")
     )
+    revived_result = await db.execute(
+        update(models.Source)
+        .where(models.Source.test_status == "dead")
+        .where(or_(models.Source.fail_since == None, models.Source.fail_since > cutoff))  # noqa: E711
+        .values(test_status="fail")
+    )
     await db.commit()
-    return result.rowcount
+    return dead_result.rowcount, revived_result.rowcount
 
 
 async def get_all_tvg_ids(db: AsyncSession) -> set[str]:
