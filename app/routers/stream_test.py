@@ -4,9 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from apscheduler.triggers.interval import IntervalTrigger
 from app.database import get_db
 from app import crud, schemas, scraper, models
-from app.docker_utils import docker_restart
 from datetime import timezone
-import asyncio
 
 router = APIRouter(prefix="/api/stream-test", tags=["stream-test"])
 
@@ -38,49 +36,14 @@ def apply_test_config(scheduler, interval_fail: int, interval_ok: int, enabled: 
     )
 
 
-async def _do_restart_containers(cfg: dict, wait: bool):
-    containers_str = cfg.get("stream_test_restart_containers", "").strip()
-    if not containers_str:
-        return
-    for name in [c.strip() for c in containers_str.split(",") if c.strip()]:
-        await docker_restart(name)
-    if wait:
-        secs = int(cfg.get("stream_test_restart_wait_seconds", "15"))
-        if secs > 0:
-            await asyncio.sleep(secs)
-
-
-async def _get_restart_cfg() -> dict:
-    from app.database import AsyncSessionLocal
-    from app import crud as _crud
-    async with AsyncSessionLocal() as db:
-        return await _crud.get_config(db)
-
-
-async def _restart_before_if_configured():
-    cfg = await _get_restart_cfg()
-    if cfg.get("stream_test_restart_enabled", "false") == "true":
-        await _do_restart_containers(cfg, wait=True)
-
-
-async def _restart_after_if_configured():
-    cfg = await _get_restart_cfg()
-    if cfg.get("stream_test_restart_after_enabled", "false") == "true":
-        await _do_restart_containers(cfg, wait=False)
-
-
 async def _test_fail_task():
     from app import scraper as sc
-    await _restart_before_if_configured()
     await sc.run_stream_tests(["untested", "fail"])
-    await _restart_after_if_configured()
 
 
 async def _test_ok_task():
     from app import scraper as sc
-    await _restart_before_if_configured()
     await sc.run_stream_tests(["ok"])
-    await _restart_after_if_configured()
 
 
 def _next_run(scheduler, job_id: str):
@@ -117,10 +80,6 @@ async def get_config(request: Request, db: AsyncSession = Depends(get_db)):
         interval_fail_minutes=int(cfg.get("stream_test_interval_fail", "60")),
         interval_ok_minutes=int(cfg.get("stream_test_interval_ok", "360")),
         concurrency=int(cfg.get("stream_test_concurrency", "5")),
-        restart_before_test=cfg.get("stream_test_restart_enabled", "false") == "true",
-        restart_after_test=cfg.get("stream_test_restart_after_enabled", "false") == "true",
-        restart_containers=cfg.get("stream_test_restart_containers", ""),
-        restart_wait_seconds=int(cfg.get("stream_test_restart_wait_seconds", "15")),
         auto_deactivate_enabled=cfg.get("stream_test_auto_deactivate_enabled", "false") == "true",
         auto_deactivate_hours=int(cfg.get("stream_test_auto_deactivate_hours", "48")),
         next_run_fail=_next_run(scheduler, JOB_FAIL),
@@ -140,10 +99,6 @@ async def update_config(
         "stream_test_interval_fail":         str(data.interval_fail_minutes),
         "stream_test_interval_ok":           str(data.interval_ok_minutes),
         "stream_test_concurrency":           str(data.concurrency),
-        "stream_test_restart_enabled":       str(data.restart_before_test).lower(),
-        "stream_test_restart_after_enabled": str(data.restart_after_test).lower(),
-        "stream_test_restart_containers":    data.restart_containers,
-        "stream_test_restart_wait_seconds":  str(data.restart_wait_seconds),
         "stream_test_auto_deactivate_enabled": str(data.auto_deactivate_enabled).lower(),
         "stream_test_auto_deactivate_hours": str(data.auto_deactivate_hours),
     })
@@ -155,46 +110,36 @@ async def update_config(
 
 @router.post("/run-now/fail", response_model=schemas.StreamTestStatus)
 async def run_now_fail(request: Request, db: AsyncSession = Depends(get_db)):
-    await _restart_before_if_configured()
     from app import scraper as sc
     await sc.run_stream_tests(["untested", "fail"])
-    await _restart_after_if_configured()
     return await get_config(request, db)
 
 
 @router.post("/run-now/ok", response_model=schemas.StreamTestStatus)
 async def run_now_ok(request: Request, db: AsyncSession = Depends(get_db)):
-    await _restart_before_if_configured()
     from app import scraper as sc
     await sc.run_stream_tests(["ok"])
-    await _restart_after_if_configured()
     return await get_config(request, db)
 
 
 @router.post("/run-now/untested", response_model=schemas.StreamTestStatus)
 async def run_now_untested(request: Request, db: AsyncSession = Depends(get_db)):
-    await _restart_before_if_configured()
     from app import scraper as sc
     await sc.run_stream_tests(["untested"])
-    await _restart_after_if_configured()
     return await get_config(request, db)
 
 
 @router.post("/run-now/all", response_model=schemas.StreamTestStatus)
 async def run_now_all(request: Request, db: AsyncSession = Depends(get_db)):
-    await _restart_before_if_configured()
     from app import scraper as sc
     await sc.run_stream_tests(["untested", "fail", "ok"])
-    await _restart_after_if_configured()
     return await get_config(request, db)
 
 
 @router.post("/run-now/dead", response_model=schemas.StreamTestStatus)
 async def run_now_dead(request: Request, db: AsyncSession = Depends(get_db)):
-    await _restart_before_if_configured()
     from app import scraper as sc
     await sc.run_stream_tests(["dead"])
-    await _restart_after_if_configured()
     return await get_config(request, db)
 
 

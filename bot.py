@@ -22,8 +22,6 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from app.docker_utils import docker_restart
-
 load_dotenv()
 
 logging.basicConfig(
@@ -75,8 +73,7 @@ HELP = (
     "/test\\_ok — Probar streams OK\n"
     "/test\\_untested — Probar streams no probados\n"
     "/test\\_all — Probar todos los streams\n"
-    "/buscar `<nombre>` — Buscar canal por nombre\n"
-    "/reiniciar — Reiniciar contenedores Acestream/Acexy"
+    "/buscar `<nombre>` — Buscar canal por nombre"
 )
 
 
@@ -201,61 +198,6 @@ async def cmd_test_all(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
     await _run_test(update, "/api/stream-test/run-now/all", "Prueba de todos los streams")
 
 
-# ── Docker restart ────────────────────────────────────────────────────────────
-
-_RESTART_TARGETS = {
-    "acestream": "acestream",
-    "acexy":     "acexy",
-}
-
-
-async def cmd_reiniciar(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
-    if not authorized(update):
-        return await deny(update)
-
-    keyboard = [
-        [
-            InlineKeyboardButton("🔄 Acestream", callback_data="restart:acestream"),
-            InlineKeyboardButton("🔄 Acexy",     callback_data="restart:acexy"),
-        ],
-        [InlineKeyboardButton("🔄 Ambos",         callback_data="restart:both")],
-    ]
-    await update.message.reply_text(
-        "¿Qué contenedor quieres reiniciar?",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-    )
-
-
-async def cb_restart(update: Update, _ctx: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    if not authorized(update):
-        await query.edit_message_text("⛔ No autorizado.")
-        return
-
-    target = query.data.split(":")[1]
-
-    if target == "both":
-        containers = list(_RESTART_TARGETS.values())
-        label = "Acestream + Acexy"
-    else:
-        containers = [_RESTART_TARGETS[target]]
-        label = target.capitalize()
-
-    await query.edit_message_text(f"⏳ Reiniciando {label}…")
-
-    lines = []
-    for name in containers:
-        ok, err = await docker_restart(name)
-        if ok:
-            lines.append(f"✅ <b>{name}</b> reiniciado")
-        else:
-            lines.append(f"❌ <b>{name}</b>: {html.escape(err)}")
-
-    await query.edit_message_text("\n".join(lines), parse_mode="HTML")
-
-
 # ── Channel search ────────────────────────────────────────────────────────────
 
 MAX_RESULTS = 20
@@ -373,9 +315,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("test_untested",cmd_test_untested))
     app.add_handler(CommandHandler("test_all",     cmd_test_all))
     app.add_handler(CommandHandler("buscar",       cmd_buscar))
-    app.add_handler(CommandHandler("reiniciar",    cmd_reiniciar))
     app.add_handler(CallbackQueryHandler(cb_channel, pattern=r"^ch:\d+$"))
-    app.add_handler(CallbackQueryHandler(cb_restart, pattern=r"^restart:(acestream|acexy|both)$"))
 
     return app
 

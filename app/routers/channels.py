@@ -51,7 +51,10 @@ async def bulk_upload_logo(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
-    channel_ids: list[int] = json.loads(ids)
+    try:
+        channel_ids: list[int] = json.loads(ids)
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(status_code=400, detail="ids debe ser una lista JSON de enteros")
     if not channel_ids:
         return []
 

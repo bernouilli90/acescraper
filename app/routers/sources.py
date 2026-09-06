@@ -21,6 +21,8 @@ async def create_source(data: schemas.SourceCreate, db: AsyncSession = Depends(g
     existing = await crud.get_source_by_hash(db, data.ace_hash)
     if existing:
         raise HTTPException(status_code=409, detail="Hash already exists")
+    if data.channel_id is not None and not await crud.get_channel(db, data.channel_id):
+        raise HTTPException(status_code=404, detail="Channel not found")
     return await crud.create_source(db, data)
 
 
@@ -70,6 +72,8 @@ async def import_from_url(
 @router.patch("/bulk-assign", status_code=status.HTTP_200_OK)
 async def bulk_assign_sources(data: schemas.BulkAssignRequest, db: AsyncSession = Depends(get_db)):
     from sqlalchemy import update
+    if data.channel_id is not None and not await crud.get_channel(db, data.channel_id):
+        raise HTTPException(status_code=404, detail="Channel not found")
     await db.execute(
         update(models.Source)
         .where(models.Source.id.in_(data.ids))
@@ -81,6 +85,8 @@ async def bulk_assign_sources(data: schemas.BulkAssignRequest, db: AsyncSession 
 
 @router.patch("/{source_id}", response_model=schemas.SourceOut)
 async def update_source(source_id: int, data: schemas.SourceUpdate, db: AsyncSession = Depends(get_db)):
+    if data.channel_id is not None and not await crud.get_channel(db, data.channel_id):
+        raise HTTPException(status_code=404, detail="Channel not found")
     src = await crud.update_source(db, source_id, data)
     if not src:
         raise HTTPException(status_code=404, detail="Source not found")

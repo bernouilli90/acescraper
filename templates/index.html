@@ -763,7 +763,7 @@
   <div class="card">
     <div class="card-body">
       <p class="card-title">Importar hashes</p>
-      <div class="grid-2">
+      <div class="grid-import">
         <div class="space-s">
           <label class="field-label">Pegar texto (M3U, lista…)</label>
           <textarea id="import-text" rows="4" placeholder="Pega aquí contenido con hashes acestream…"></textarea>
@@ -773,6 +773,11 @@
           <label class="field-label">Subir archivo</label>
           <input id="import-file" type="file" accept=".m3u,.txt,.m3u8"/>
           <button class="btn btn-accent" style="width:100%;margin-top:.5rem" onclick="importFile()">Subir archivo</button>
+        </div>
+        <div class="space-s">
+          <label class="field-label">Importar desde URL</label>
+          <input id="import-url" type="url" placeholder="https://ejemplo.com/lista.m3u"/>
+          <button class="btn btn-accent" style="width:100%;margin-top:.5rem" onclick="importUrl()">Importar desde URL</button>
         </div>
       </div>
       <p id="import-result" class="success-msg" style="margin-top:.75rem"></p>
@@ -1062,50 +1067,6 @@
         </div>
       </div>
 
-      <!-- Restart section -->
-      <div style="border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;margin-bottom:1rem">
-        <p style="font-size:.8rem;font-weight:600;margin:0 0 .75rem">Reinicio de contenedores</p>
-
-        <!-- Toggles row -->
-        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:.75rem">
-          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
-            <div style="position:relative;display:inline-block;width:40px;height:22px">
-              <input type="checkbox" id="stest-restart-enabled" onchange="stestRestartToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
-              <span id="stest-restart-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
-              <span id="stest-restart-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
-            </div>
-            <span style="font-size:.85rem">Antes de la prueba</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
-            <div style="position:relative;display:inline-block;width:40px;height:22px">
-              <input type="checkbox" id="stest-restart-after-enabled" onchange="stestRestartToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
-              <span id="stest-restart-after-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
-              <span id="stest-restart-after-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
-            </div>
-            <span style="font-size:.85rem">Después de la prueba</span>
-          </label>
-        </div>
-
-        <!-- Container list + wait (shown when any toggle is on) -->
-        <div id="stest-restart-body" style="display:none">
-          <div style="display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap">
-            <div style="flex:1;min-width:200px">
-              <p style="font-size:.75rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem">Contenedores a reiniciar</p>
-              <div id="stest-containers-list" style="display:flex;flex-direction:column;gap:.3rem;max-height:160px;overflow-y:auto">
-                <p style="font-size:.8rem;color:var(--text-muted)">Cargando…</p>
-              </div>
-            </div>
-            <div style="min-width:140px">
-              <label class="field-label" for="stest-restart-wait">Esperar tras reinicio (antes)</label>
-              <div style="display:flex;gap:.5rem;align-items:center">
-                <input id="stest-restart-wait" type="number" min="0" max="120" style="width:70px" onchange="streamTestMarkDirty()"/>
-                <span style="font-size:.8rem;color:var(--text-muted)">seg</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
         <button id="stest-save-btn" class="btn btn-primary" onclick="saveStreamTest()" disabled>Guardar cambios</button>
         <button class="btn btn-ghost" onclick="runStreamTestFail()"    id="stest-run-fail-btn">▶ Probar fallidos</button>
@@ -1186,101 +1147,6 @@
     </div>
   </div>
 
-  <!-- Watchdog panel -->
-  <div class="card">
-    <div class="card-body">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-        <p class="card-title" style="margin:0">Watchdog de contenedores</p>
-        <span id="wd-status-badge" class="badge badge-gray">Cargando…</span>
-      </div>
-
-      <!-- Service status row -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-bottom:1.2rem">
-        <div id="wd-svc-acexy" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-            <span style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em">acexy</span>
-            <span id="wd-acexy-badge" class="badge badge-gray">—</span>
-          </div>
-          <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Comprobado: <span id="wd-acexy-check">—</span></p>
-          <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Reiniciado: <span id="wd-acexy-restart">—</span></p>
-          <p id="wd-acexy-streak" style="font-size:.75rem;color:var(--red,#f85149);margin:.2rem 0"></p>
-          <button class="btn btn-ghost btn-sm" style="margin-top:.5rem;font-size:.75rem" onclick="wdRestart('acexy')">↺ Reiniciar</button>
-        </div>
-        <div id="wd-svc-acestream" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-            <span style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em">acestream</span>
-            <span id="wd-acestream-badge" class="badge badge-gray">—</span>
-          </div>
-          <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Comprobado: <span id="wd-acestream-check">—</span></p>
-          <p style="font-size:.75rem;color:var(--text-muted);margin:.2rem 0">Reiniciado: <span id="wd-acestream-restart">—</span></p>
-          <p id="wd-acestream-streak" style="font-size:.75rem;color:var(--red,#f85149);margin:.2rem 0"></p>
-          <button class="btn btn-ghost btn-sm" style="margin-top:.5rem;font-size:.75rem" onclick="wdRestart('acestream')">↺ Reiniciar</button>
-        </div>
-      </div>
-
-      <!-- Config grid -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:1rem">
-
-        <!-- Enabled toggle -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Estado</p>
-          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
-            <div style="position:relative;display:inline-block;width:40px;height:22px">
-              <input type="checkbox" id="wd-enabled" onchange="wdToggle()" style="opacity:0;width:0;height:0;position:absolute"/>
-              <span id="wd-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
-              <span id="wd-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
-            </div>
-            <span id="wd-enabled-label" style="font-size:.9rem;font-weight:500">—</span>
-          </label>
-        </div>
-
-        <!-- Auto-restart toggle -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <p style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.5rem">Auto-reinicio</p>
-          <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer">
-            <div style="position:relative;display:inline-block;width:40px;height:22px">
-              <input type="checkbox" id="wd-auto-restart" onchange="wdMarkDirty()" style="opacity:0;width:0;height:0;position:absolute"/>
-              <span id="wd-ar-track" style="position:absolute;inset:0;border-radius:11px;background:var(--border2);transition:.2s;cursor:pointer"></span>
-              <span id="wd-ar-thumb" style="position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s;pointer-events:none"></span>
-            </div>
-            <span id="wd-ar-label" style="font-size:.9rem;font-weight:500">—</span>
-          </label>
-        </div>
-
-        <!-- Interval -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <label class="field-label" for="wd-interval">Intervalo de comprobación</label>
-          <div style="display:flex;gap:.5rem;align-items:center">
-            <input id="wd-interval" type="number" min="1" max="1440" style="width:90px" onchange="wdMarkDirty()"/>
-            <span style="font-size:.8rem;color:var(--text-muted)">min</span>
-          </div>
-        </div>
-
-        <!-- acexy container name -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <label class="field-label" for="wd-acexy-container">Contenedor acexy</label>
-          <select id="wd-acexy-container" style="width:100%" onchange="wdMarkDirty()">
-            <option value="">Cargando…</option>
-          </select>
-        </div>
-
-        <!-- acestream container name -->
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem">
-          <label class="field-label" for="wd-acestream-container">Contenedor acestream</label>
-          <select id="wd-acestream-container" style="width:100%" onchange="wdMarkDirty()">
-            <option value="">Cargando…</option>
-          </select>
-        </div>
-
-      </div>
-
-      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-        <button id="wd-save-btn" class="btn btn-primary" onclick="saveWatchdog()" disabled>Guardar cambios</button>
-        <button class="btn btn-ghost" onclick="wdCheckNow()" id="wd-check-btn">▶ Comprobar ahora</button>
-        <p id="wd-msg" class="success-msg" style="margin:0"></p>
-      </div>
-    </div>
-  </div>
 
 </section>
 
@@ -1825,7 +1691,7 @@ async function loadAll() {
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.tab-content').forEach(s => s.classList.toggle('active', s.id === `tab-${name}`));
-  if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); loadWatchdog(); }
+  if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); }
   if (name === 'export') loadExportProfiles();
   if (name === 'feeds')  { loadXmltvSources(); }
 }
@@ -3418,7 +3284,6 @@ async function loadStreamTest() {
   try {
     stestState = await api('GET', '/api/stream-test/config');
     renderStreamTest(stestState);
-    await loadStestContainers(stestState.restart_containers);
   } catch(e) { /* silent */ }
 }
 
@@ -3442,16 +3307,6 @@ function renderStreamTest(s) {
   document.getElementById('stest-last-run').textContent =
     s.last_run      ? new Date(s.last_run       + 'Z').toLocaleString('es-ES') : 'Nunca';
 
-  // Restart toggles
-  const restartBefore = s.restart_before_test;
-  const restartAfter  = s.restart_after_test;
-  document.getElementById('stest-restart-enabled').checked       = restartBefore;
-  document.getElementById('stest-restart-after-enabled').checked = restartAfter;
-  _updateStestRestartToggleUI(restartBefore, 'stest-restart-track', 'stest-restart-thumb');
-  _updateStestRestartToggleUI(restartAfter,  'stest-restart-after-track', 'stest-restart-after-thumb');
-  document.getElementById('stest-restart-body').style.display = (restartBefore || restartAfter) ? 'block' : 'none';
-  document.getElementById('stest-restart-wait').value = s.restart_wait_seconds ?? 15;
-
   const autodeactOn = s.auto_deactivate_enabled;
   document.getElementById('stest-autodeact-enabled').checked = autodeactOn;
   document.getElementById('stest-autodeact-track').style.background = autodeactOn ? 'var(--accent)' : 'var(--border2)';
@@ -3460,46 +3315,6 @@ function renderStreamTest(s) {
 
   stestDirty = false;
   document.getElementById('stest-save-btn').disabled = true;
-}
-
-async function loadStestContainers(selectedCsv) {
-  const selected = (selectedCsv || '').split(',').map(s => s.trim()).filter(Boolean);
-  const el = document.getElementById('stest-containers-list');
-  el.innerHTML = '<p style="font-size:.8rem;color:var(--text-muted)">Cargando…</p>';
-  try {
-    const containers = await api('GET', '/api/watchdog/containers');
-    if (!containers.length) {
-      el.innerHTML = '<p style="font-size:.8rem;color:var(--text-muted)">No se pudo conectar con Docker</p>';
-      return;
-    }
-    el.innerHTML = containers.map(c => {
-      const checked = selected.includes(c.name) ? 'checked' : '';
-      const dot = c.status === 'running'
-        ? '<span style="color:var(--green);margin-right:.3rem">●</span>'
-        : '<span style="color:var(--red,#f85149);margin-right:.3rem">●</span>';
-      return `<label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.82rem">
-        <input type="checkbox" class="stest-container-cb" value="${esc(c.name)}" ${checked} onchange="streamTestMarkDirty()"/>
-        ${dot}<span style="font-weight:500">${esc(c.name)}</span>
-        <span style="color:var(--text-muted);font-size:.75rem">${esc(c.image)}</span>
-      </label>`;
-    }).join('');
-  } catch(e) {
-    el.innerHTML = '<p style="font-size:.8rem;color:var(--text-muted)">Error al obtener contenedores</p>';
-  }
-}
-
-function _updateStestRestartToggleUI(on, trackId, thumbId) {
-  document.getElementById(trackId).style.background = on ? 'var(--accent)' : 'var(--border2)';
-  document.getElementById(thumbId).style.left = on ? '21px' : '3px';
-}
-
-function stestRestartToggle() {
-  const before = document.getElementById('stest-restart-enabled').checked;
-  const after  = document.getElementById('stest-restart-after-enabled').checked;
-  _updateStestRestartToggleUI(before, 'stest-restart-track', 'stest-restart-thumb');
-  _updateStestRestartToggleUI(after,  'stest-restart-after-track', 'stest-restart-after-thumb');
-  document.getElementById('stest-restart-body').style.display = (before || after) ? 'block' : 'none';
-  streamTestMarkDirty();
 }
 
 function updateStreamTestToggleUI(enabled) {
@@ -3530,17 +3345,11 @@ async function saveStreamTest() {
   const interval_fail_minutes = Math.max(1, +document.getElementById('stest-interval-fail').value);
   const interval_ok_minutes   = Math.max(1, +document.getElementById('stest-interval-ok').value);
   const concurrency           = Math.min(50, Math.max(1, +document.getElementById('stest-concurrency').value));
-  const restart_before_test   = document.getElementById('stest-restart-enabled').checked;
-  const restart_after_test    = document.getElementById('stest-restart-after-enabled').checked;
-  const restart_wait_seconds  = Math.max(0, +document.getElementById('stest-restart-wait').value);
-  const restart_containers    = Array.from(document.querySelectorAll('.stest-container-cb:checked'))
-                                     .map(cb => cb.value).join(',');
   try {
     const auto_deactivate_enabled = document.getElementById('stest-autodeact-enabled').checked;
     const auto_deactivate_hours   = Math.max(1, +document.getElementById('stest-autodeact-hours').value);
     stestState = await api('PUT', '/api/stream-test/config', {
       enabled, interval_fail_minutes, interval_ok_minutes, concurrency,
-      restart_before_test, restart_after_test, restart_containers, restart_wait_seconds,
       auto_deactivate_enabled, auto_deactivate_hours,
     });
     renderStreamTest(stestState);
@@ -3704,150 +3513,6 @@ async function generateEpgNow() {
     btn.textContent = '▶ Generar ahora';
     btn.disabled = false;
   }
-}
-
-// ── Watchdog ──────────────────────────────────────────────────────────────────
-let wdDirty = false;
-
-function _fillWdSelect(id, containers, currentVal) {
-  const sel = document.getElementById(id);
-  if (!containers || !containers.length) {
-    sel.innerHTML = `<option value="${esc(currentVal)}">${esc(currentVal || '—')} (Docker no disponible)</option>`;
-    return;
-  }
-  const names = new Set(containers.map(c => c.name));
-  let opts = '';
-  if (currentVal && !names.has(currentVal)) {
-    opts += `<option value="${esc(currentVal)}" selected>${esc(currentVal)} (no encontrado)</option>`;
-  }
-  opts += containers.map(c => {
-    const dot  = c.status === 'running' ? '● ' : '○ ';
-    const sel2 = c.name === currentVal ? ' selected' : '';
-    return `<option value="${esc(c.name)}"${sel2}>${dot}${esc(c.name)}  [${esc(c.status)}]</option>`;
-  }).join('');
-  sel.innerHTML = opts;
-}
-
-async function loadWatchdog() {
-  const [s, containers] = await Promise.all([
-    api('GET', '/api/watchdog/status'),
-    api('GET', '/api/watchdog/containers').catch(() => []),
-  ]);
-  _fillWdSelect('wd-acexy-container',     containers, s.acexy_container);
-  _fillWdSelect('wd-acestream-container', containers, s.acestream_container);
-  renderWatchdog(s);
-}
-
-function _wdStatusBadge(status, failingStreak) {
-  if (status === 'ok' && failingStreak > 0) return '<span class="badge badge-yellow">Advertencia</span>';
-  if (status === 'ok')         return '<span class="badge badge-green">OK</span>';
-  if (status === 'unhealthy')  return '<span class="badge badge-red">No saludable</span>';
-  if (status === 'stopped')    return '<span class="badge badge-red">Parado</span>';
-  if (status === 'starting')   return '<span class="badge badge-yellow">Iniciando</span>';
-  if (status === 'not_found')  return '<span class="badge badge-gray">No encontrado</span>';
-  if (status === 'error')      return '<span class="badge badge-gray">Error Docker</span>';
-  return '<span class="badge badge-gray">—</span>';
-}
-
-function _wdFmtDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('es-ES', {hour:'2-digit', minute:'2-digit', second:'2-digit', day:'2-digit', month:'2-digit'});
-}
-
-function renderWatchdog(s) {
-  const on = s.enabled;
-  document.getElementById('wd-status-badge').className = `badge ${on ? 'badge-green' : 'badge-gray'}`;
-  document.getElementById('wd-status-badge').textContent = on ? 'Activo' : 'Inactivo';
-
-  // Toggle state
-  const cbEn = document.getElementById('wd-enabled');
-  cbEn.checked = on;
-  document.getElementById('wd-track').style.background = on ? 'var(--accent)' : 'var(--border2)';
-  document.getElementById('wd-thumb').style.left = on ? '21px' : '3px';
-  document.getElementById('wd-enabled-label').textContent = on ? 'Activado' : 'Desactivado';
-
-  const ar = s.auto_restart;
-  const cbAr = document.getElementById('wd-auto-restart');
-  cbAr.checked = ar;
-  document.getElementById('wd-ar-track').style.background = ar ? 'var(--accent)' : 'var(--border2)';
-  document.getElementById('wd-ar-thumb').style.left = ar ? '21px' : '3px';
-  document.getElementById('wd-ar-label').textContent = ar ? 'Activado' : 'Desactivado';
-
-  document.getElementById('wd-interval').value = s.interval_minutes;
-
-  // Service status cards
-  for (const svc of ['acexy', 'acestream']) {
-    const info = s.services[svc];
-    document.getElementById(`wd-${svc}-badge`).outerHTML =
-      `<span id="wd-${svc}-badge">${_wdStatusBadge(info.status, info.failing_streak)}</span>`;
-    document.getElementById(`wd-${svc}-check`).textContent   = _wdFmtDate(info.last_check);
-    document.getElementById(`wd-${svc}-restart`).textContent = _wdFmtDate(info.last_restart);
-    const streakEl = document.getElementById(`wd-${svc}-streak`);
-    if (streakEl) streakEl.textContent = info.failing_streak > 0 ? `Fallos consecutivos: ${info.failing_streak}` : '';
-  }
-
-  wdDirty = false;
-  document.getElementById('wd-save-btn').disabled = true;
-}
-
-function wdMarkDirty() {
-  wdDirty = true;
-  document.getElementById('wd-save-btn').disabled = false;
-}
-
-function wdToggle() {
-  wdMarkDirty();
-  const on = document.getElementById('wd-enabled').checked;
-  document.getElementById('wd-track').style.background = on ? 'var(--accent)' : 'var(--border2)';
-  document.getElementById('wd-thumb').style.left = on ? '21px' : '3px';
-  document.getElementById('wd-enabled-label').textContent = on ? 'Activado' : 'Desactivado';
-}
-
-async function saveWatchdog() {
-  const btn = document.getElementById('wd-save-btn');
-  btn.disabled = true;
-  try {
-    const s = await api('PUT', '/api/watchdog/config', {
-      enabled:              document.getElementById('wd-enabled').checked,
-      auto_restart:         document.getElementById('wd-auto-restart').checked,
-      interval_minutes:     +document.getElementById('wd-interval').value,
-      acexy_container:      document.getElementById('wd-acexy-container').value.trim(),
-      acestream_container:  document.getElementById('wd-acestream-container').value.trim(),
-    });
-    renderWatchdog(s);
-    const msg = document.getElementById('wd-msg');
-    msg.textContent = '✓ Configuración guardada';
-    setTimeout(() => msg.textContent = '', 3000);
-  } catch(e) { alert(e.message); btn.disabled = false; }
-}
-
-async function wdCheckNow() {
-  const btn = document.getElementById('wd-check-btn');
-  btn.textContent = 'Comprobando…';
-  btn.disabled = true;
-  try {
-    const s = await api('POST', '/api/watchdog/check-now');
-    renderWatchdog(s);
-    const msg = document.getElementById('wd-msg');
-    msg.textContent = '✓ Comprobación completada';
-    setTimeout(() => msg.textContent = '', 3000);
-  } catch(e) { alert(e.message); }
-  finally { btn.textContent = '▶ Comprobar ahora'; btn.disabled = false; }
-}
-
-async function wdRestart(service) {
-  if (!confirm(`¿Reiniciar el contenedor ${service}?`)) return;
-  const msg = document.getElementById('wd-msg');
-  try {
-    const r = await api('POST', `/api/watchdog/restart/${service}`);
-    if (r.restarted) {
-      msg.textContent = `✓ ${service} reiniciado`;
-      await loadWatchdog();
-    } else {
-      msg.textContent = `✗ Error: ${r.error || 'desconocido'}`;
-    }
-    setTimeout(() => msg.textContent = '', 5000);
-  } catch(e) { alert(e.message); }
 }
 
 async function testSource(sourceId) {

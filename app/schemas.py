@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from typing import Optional
 from datetime import datetime
 
@@ -154,7 +154,7 @@ class BulkImportResult(BaseModel):
 # --- Scheduler ---
 class SchedulerConfig(BaseModel):
     enabled: bool = True
-    interval_minutes: int = 360  # 6 hours default
+    interval_minutes: int = Field(360, ge=1)  # 6 hours default
 
 class SchedulerStatus(SchedulerConfig):
     next_run: Optional[datetime] = None
@@ -165,8 +165,8 @@ class SchedulerStatus(SchedulerConfig):
 # --- EPG ---
 class EpgConfig(BaseModel):
     enabled: bool = False
-    interval_hours: int = 24
-    days: int = 7
+    interval_hours: int = Field(24, ge=1)
+    days: int = Field(7, ge=1)
 
 class EpgStatus(EpgConfig):
     next_run: Optional[datetime] = None
@@ -179,15 +179,11 @@ class EpgStatus(EpgConfig):
 # --- Stream test ---
 class StreamTestConfig(BaseModel):
     enabled: bool = False
-    interval_fail_minutes: int = 60
-    interval_ok_minutes: int = 360
-    concurrency: int = 5
-    restart_before_test: bool = False
-    restart_after_test: bool = False
-    restart_containers: str = ""   # comma-separated container names
-    restart_wait_seconds: int = 15
+    interval_fail_minutes: int = Field(60, ge=1)
+    interval_ok_minutes: int = Field(360, ge=1)
+    concurrency: int = Field(5, ge=1)
     auto_deactivate_enabled: bool = False
-    auto_deactivate_hours: int = 48
+    auto_deactivate_hours: int = Field(48, ge=1)
 
 class StreamTestStatus(StreamTestConfig):
     next_run_fail: Optional[datetime] = None
@@ -209,12 +205,3 @@ class ExportProfileOut(ExportProfileIn):
     id: int
     created_at: Optional[datetime] = None
     model_config = {"from_attributes": True}
-
-
-# --- Watchdog ---
-class WatchdogConfig(BaseModel):
-    enabled: bool = False
-    interval_minutes: int = 5
-    auto_restart: bool = True
-    acexy_container: str = "acexy"
-    acestream_container: str = "acestream"

@@ -52,8 +52,9 @@ async def create_channel(db: AsyncSession, data: schemas.ChannelCreate):
     channel = models.Channel(tvg_id=data.tvg_id, name=data.name, logo=data.logo, groups=groups)
     db.add(channel)
     await db.commit()
-    await db.refresh(channel)
-    return channel
+    # Plain refresh() doesn't eager-load relationships, and ChannelOut needs
+    # groups/source_count/xmltv_ids — re-fetch with the same selectinload as get_channel.
+    return await get_channel(db, channel.id)
 
 
 async def update_channel(db: AsyncSession, channel_id: int, data: schemas.ChannelUpdate):
@@ -332,6 +333,11 @@ async def get_groups(db: AsyncSession):
     return result.scalars().all()
 
 
+async def get_group_by_name(db: AsyncSession, name: str):
+    result = await db.execute(select(models.Group).where(models.Group.name == name))
+    return result.scalar_one_or_none()
+
+
 async def get_group_channels_with_active_sources(db: AsyncSession, group_id: int):
     """Channels in the group (ordered) that have at least one active source."""
     q = (
@@ -486,6 +492,11 @@ async def import_xmltv_channels(db: AsyncSession, channels: list[dict], xmltv_id
             await db.execute(
                 models.channel_xmltv.insert().values(channel_id=new_ch.id, xmltv_id=xmltv_id)
             )
+            # Registrar el enlace ya creado — si el XMLTV trae el mismo tvg_id
+            # duplicado (ocurre en ficheros reales), la siguiente aparición
+            # entra por la rama `if existing:` y sin esto reintentaría el
+            # mismo INSERT, chocando con la unique constraint de channel_xmltv.
+            linked_channel_ids.add(new_ch.id)
             existing_by_tvg[ch["tvg_id"]] = new_ch
             created += 1
 

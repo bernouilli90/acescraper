@@ -15,6 +15,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 ACE_HASH_RE = re.compile(r'\b([0-9a-fA-F]{40})\b')
 TVG_ID_RE   = re.compile(r'tvg-id="([^"]*)"', re.IGNORECASE)
 
+# Algunos gateways (IPFS/Cloudflare, etc.) devuelven 403 a clientes sin
+# User-Agent de navegador — httpx.AsyncClient manda "python-httpx/x.y" por
+# defecto. Con este UA las descargas de feeds/XMLTV pasan igual que en un navegador.
+FETCH_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    )
+}
+
 
 def parse_m3u(text: str) -> list[dict]:
     """Parse M3U or plain text. Returns list of {ace_hash, tvg_id, label}.
@@ -61,7 +71,7 @@ def extract_hashes(text: str) -> list[str]:
 
 
 async def fetch_and_parse(url: str) -> list[dict]:
-    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=FETCH_HEADERS) as client:
         resp = await client.get(url)
         resp.raise_for_status()
     return parse_m3u(resp.text)
@@ -110,7 +120,7 @@ async def fetch_xmltv(url: str) -> list[dict]:
     fd, tmp_path = tempfile.mkstemp(suffix='.xmltv')
     os.close(fd)
     try:
-        async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=60, follow_redirects=True, headers=FETCH_HEADERS) as client:
             async with client.stream("GET", url) as resp:
                 resp.raise_for_status()
                 async with aiofiles.open(tmp_path, 'wb') as f:
@@ -340,7 +350,7 @@ async def generate_epg(tvg_ids: set[str], days: int, xmltv_urls: list[str], out_
             fd2, src_tmp = tempfile.mkstemp(suffix='.xmltv_src')
             os.close(fd2)
             try:
-                async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
+                async with httpx.AsyncClient(timeout=120, follow_redirects=True, headers=FETCH_HEADERS) as client:
                     async with client.stream("GET", url) as resp:
                         resp.raise_for_status()
                         async with aiofiles.open(src_tmp, 'wb') as f:
