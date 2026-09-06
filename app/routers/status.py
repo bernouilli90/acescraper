@@ -7,7 +7,6 @@ router = APIRouter(prefix="/api/status", tags=["status"])
 @router.get("")
 async def get_status():
     from app.scraper import test_progress, feed_progress
-    from app.routers.watchdog import _state as wd_state
 
     return {
         "version": APP_VERSION,
@@ -25,5 +24,4 @@ async def get_status():
             "total":       feed_progress["total"],
             "current_url": feed_progress["current_url"],
         },
-        "watchdog": wd_state,
     }

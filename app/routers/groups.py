@@ -21,6 +21,8 @@ async def list_groups(db: AsyncSession = Depends(get_db)):
 
 @router.post("/", response_model=schemas.GroupOut, status_code=status.HTTP_201_CREATED)
 async def create_group(data: schemas.GroupCreate, db: AsyncSession = Depends(get_db)):
+    if await crud.get_group_by_name(db, data.name):
+        raise HTTPException(status_code=409, detail="Group name already exists")
     return await crud.create_group(db, data)
 
 
