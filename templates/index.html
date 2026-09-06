@@ -3829,7 +3829,11 @@ function _startStream(hash) {
     _mpegtsPlayer = null;
   }
   video.pause();
-  video.src = '';
+  // removeAttribute (not src='') — an empty-string src is itself an invalid
+  // media source and queues a spurious `error` event; since that event fires
+  // asynchronously, it would land on the onerror handler assigned right below
+  // and show "Error: sin conexión" before the real stream even started loading.
+  video.removeAttribute('src');
   video.load(); // reset media element, cancel pending requests
 
   video.onplay    = _updatePlayPauseIcon;
@@ -3996,7 +4000,7 @@ function closePlayModal() {
   video.onplaying = null;
   video.onerror   = null;
   video.pause();
-  video.src = '';
+  video.removeAttribute('src');
   video.load(); // cancel pending requests and fully reset the media element
   document.getElementById('play-video-container').classList.remove('hide-cursor');
   closeModal('modal-play');
