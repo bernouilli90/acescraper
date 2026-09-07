@@ -746,6 +746,8 @@
           <label class="field-label" style="margin-bottom:.3rem">Feed</label>
           <select id="src-f-feed" onchange="filterSources()" style="height:36px;padding:.35rem .7rem;width:auto">
             <option value="">Todos</option>
+            <option value="__manual__">Manual</option>
+            <option disabled>──────────────</option>
           </select>
         </div>
         <div>
@@ -2417,7 +2419,8 @@ function rebuildChannelFilter() {
 
 function rebuildFeedFilter() {
   const sel = document.getElementById('src-f-feed');
-  while (sel.options.length > 1) sel.remove(1);
+  // Keep first 3 fixed options (Todos, Manual, separator), rebuild the feed list after them
+  while (sel.options.length > 3) sel.remove(3);
   feeds.forEach(f => {
     const label = f.label || (f.url.length > 40 ? f.url.slice(0, 40) + '…' : f.url);
     sel.add(new Option(label, String(f.id)));
@@ -2477,7 +2480,8 @@ function filterSources() {
     if (status === 'active'   && !s.active) return false;
     if (status === 'inactive' &&  s.active) return false;
     if (!isDeletedView && testF && (s.test_status || 'untested') !== testF) return false;
-    if (feedId && s.feed_url_id !== +feedId) return false;
+    if (feedId === '__manual__' && s.feed_url_id != null) return false;
+    if (feedId && feedId !== '__manual__' && s.feed_url_id !== +feedId) return false;
     if (groupF) {
       const ch = channels.find(c => c.id === s.channel_id);
       const chGroups = ch?.groups || [];
