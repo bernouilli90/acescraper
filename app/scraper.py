@@ -1,9 +1,11 @@
 import asyncio
+import difflib
 import gzip
 import io
 import os
 import re
 import tempfile
+import unicodedata
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -68,6 +70,86 @@ def parse_m3u(text: str) -> list[dict]:
 
 def extract_hashes(text: str) -> list[str]:
     return [e['ace_hash'] for e in parse_m3u(text)]
+
+
+_HASH_LINE_RE = re.compile(r'^(?:acestream://)?([0-9a-fA-F]{40})$', re.IGNORECASE)
+
+
+def parse_name_hash_pairs(text: str) -> list[dict]:
+    """Parse "name line, then hash line" pastes (one pair per hash, no M3U/#EXTINF
+    markup) — e.g. lists copy-pasted from a Telegram channel or similar:
+
+        Nombre del canal
+        0123456789abcdef0123456789abcdef01234567
+
+    Returns list of {ace_hash, label}, in order, deduplicated by hash (first
+    occurrence wins). `label` is whatever non-blank line immediately preceded
+    the hash line — None if a hash appears with no preceding text (e.g. two
+    hashes back to back). Blank lines are just separators and are ignored.
+    """
+    entries: list[dict] = []
+    seen: set[str] = set()
+    pending_label: Optional[str] = None
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        m = _HASH_LINE_RE.match(line)
+        if m:
+            h = m.group(1).lower()
+            if h not in seen:
+                seen.add(h)
+                entries.append({'ace_hash': h, 'label': pending_label})
+            pending_label = None
+        else:
+            pending_label = line
+
+    return entries
+
+
+# Tokens that describe the stream (resolution/quality), not the channel's
+# identity — stripped before comparing a pasted label against tvg_id/name so
+# they don't drag the match score down or up by coincidence.
+_MATCH_NOISE_RE = re.compile(r'\b(?:hd|fhd|uhd|sd|4k|hq|\d{3,4}p?|\d{1,2}\.\d{1,2})\b')
+_MATCH_STRIP_RE = re.compile(r'[^a-z0-9]+')
+_MATCH_THRESHOLD = 0.6  # below this, leave the hash unassigned rather than guess wrong
+
+
+def _normalize_for_match(s: str) -> str:
+    s = unicodedata.normalize('NFKD', s or '')
+    s = ''.join(c for c in s if not unicodedata.combining(c))  # e.g. á -> a
+    s = s.lower()
+    s = _MATCH_NOISE_RE.sub(' ', s)
+    s = _MATCH_STRIP_RE.sub(' ', s)  # drops emoji/punctuation too, not just accents
+    return ' '.join(s.split())
+
+
+def _match_score(label_norm: str, candidate_norm: str) -> float:
+    if not label_norm or not candidate_norm:
+        return 0.0
+    ratio = difflib.SequenceMatcher(None, label_norm, candidate_norm).ratio()
+    a, b = set(label_norm.split()), set(candidate_norm.split())
+    overlap = len(a & b) / max(len(a), len(b)) if a and b else 0.0
+    return max(ratio, overlap)
+
+
+def find_best_channel_match(label: Optional[str], channels: list) -> Optional[int]:
+    """Best-guess channel_id for a pasted label, matched against each channel's
+    tvg_id and name. Returns None if nothing clears _MATCH_THRESHOLD — the hash
+    is created unassigned rather than risking a wrong auto-match (and, same as
+    any other auto-assignment, still needs a human pass in "Validar canales").
+    """
+    label_norm = _normalize_for_match(label or '')
+    if not label_norm:
+        return None
+    best_id, best_score = None, 0.0
+    for ch in channels:
+        for candidate in (ch.tvg_id, ch.name):
+            score = _match_score(label_norm, _normalize_for_match(candidate or ''))
+            if score > best_score:
+                best_id, best_score = ch.id, score
+    return best_id if best_score >= _MATCH_THRESHOLD else None
 
 
 async def fetch_and_parse(url: str) -> list[dict]:

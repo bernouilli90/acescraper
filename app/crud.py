@@ -127,9 +127,10 @@ async def bulk_create_sources(
     feed_url_id: Optional[int] = None,
 ) -> dict:
     """
-    entries: list of {ace_hash, tvg_id?, label?}
-    - New hash: create it; if tvg_id resolves to a channel, assign it.
-    - Existing hash without channel: assign channel from tvg_id if available.
+    entries: list of {ace_hash, tvg_id?, label?, channel_id?}
+    - New hash: create it; if tvg_id resolves to a channel (or channel_id is
+      already given directly, e.g. from the paste-import's fuzzy match), assign it.
+    - Existing hash without channel: assign channel the same way.
     - Existing hash with channel already set: skip (never override).
     """
     if not entries:
@@ -160,7 +161,7 @@ async def bulk_create_sources(
         h          = entry['ace_hash']
         tvg_id     = entry.get('tvg_id')
         label      = entry.get('label')
-        channel_id = channel_by_tvg.get(tvg_id) if tvg_id else None
+        channel_id = entry.get('channel_id') or (channel_by_tvg.get(tvg_id) if tvg_id else None)
 
         existing = existing_by_hash.get(h)
         if existing:

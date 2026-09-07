@@ -583,6 +583,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-tab="channels">Canales</button>
   <button class="tab-btn" data-tab="sources">Hashes / Fuentes</button>
+  <button class="tab-btn" data-tab="import">Importar</button>
   <button class="tab-btn" data-tab="validate">Validar canales <span id="val-tab-badge" class="badge badge-yellow" style="font-size:.65rem;display:none"></span></button>
   <button class="tab-btn" data-tab="feeds">Feed URLs</button>
   <button class="tab-btn" data-tab="groups">Grupos</button>
@@ -792,6 +793,34 @@
       </table>
     </div>
   </div>
+</section>
+
+<!-- ════════════════════════════ IMPORTAR ══════════════════════════════════════ -->
+<section id="tab-import" class="tab-content space-y">
+
+  <div class="section-header">
+    <h2 class="section-title">Importar hashes</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <p class="card-title">Pegar nombre + hash</p>
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem">
+        Pega bloques de "nombre del canal" seguido de su hash en la línea
+        siguiente, uno detrás de otro (las líneas en blanco son opcionales,
+        solo sirven de separador visual). El nombre se guarda como
+        descripción del hash y además se compara con los canales existentes
+        para asignar automáticamente el que más se le parezca — esa
+        asignación, como cualquier auto-mapeo, se queda pendiente de revisar
+        en "Validar canales".
+      </p>
+      <textarea id="import-paste-text" rows="12"
+                placeholder="Nombre del canal&#10;0123456789abcdef0123456789abcdef01234567&#10;&#10;Otro canal&#10;fedcba9876543210fedcba9876543210fedcba98"></textarea>
+      <button class="btn btn-accent" style="margin-top:.6rem" onclick="importPasteHashes()">Importar</button>
+      <p id="import-paste-result" class="success-msg" style="margin-top:.75rem"></p>
+    </div>
+  </div>
+
 </section>
 
 <!-- ════════════════════════════ VALIDACIÓN DE CANALES ════════════════════════ -->
@@ -2912,6 +2941,20 @@ function importMsg(r) {
   let msg = `✓ Encontrados: ${r.total_found}  Nuevos: ${r.new_hashes}  Duplicados: ${r.duplicates}`;
   if (r.auto_mapped > 0) msg += `  Vinculados automáticamente: ${r.auto_mapped}`;
   return msg;
+}
+
+async function importPasteHashes() {
+  const textEl = document.getElementById('import-paste-text');
+  const text = textEl.value;
+  if (!text.trim()) return;
+  const fd = new FormData();
+  fd.append('text', text);
+  try {
+    const r = await api('POST', '/api/sources/import/paste', fd);
+    document.getElementById('import-paste-result').textContent = importMsg(r);
+    textEl.value = '';
+    await Promise.all([loadSources(), loadChannels()]);
+  } catch(e) { alert(e.message); }
 }
 
 function openMapModal(sourceId, hash) {

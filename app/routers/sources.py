@@ -69,6 +69,27 @@ async def import_from_url(
     return _result(result, len(entries))
 
 
+@router.post("/import/paste", response_model=schemas.BulkImportResult)
+async def import_from_paste(
+    text: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """"Nombre del canal" seguido de su hash, un par por bloque (sin M3U/#EXTINF).
+
+    El nombre pegado junto al hash se guarda como etiqueta y, además, se
+    compara (normalizado: sin acentos/emoji/resolución/fecha) contra el
+    tvg_id y el nombre de cada canal para asignar el que más se le parezca —
+    igual que un auto-mapeo por tvg_id, sigue quedando sin validar hasta que
+    se revise en "Validar canales".
+    """
+    entries = scraper.parse_name_hash_pairs(text)
+    channels = await crud.get_channels(db)
+    for entry in entries:
+        entry["channel_id"] = scraper.find_best_channel_match(entry.get("label"), channels)
+    result = await crud.bulk_create_sources(db, entries)
+    return _result(result, len(entries))
+
+
 @router.patch("/bulk-assign", status_code=status.HTTP_200_OK)
 async def bulk_assign_sources(data: schemas.BulkAssignRequest, db: AsyncSession = Depends(get_db)):
     from sqlalchemy import update
