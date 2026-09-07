@@ -1524,8 +1524,8 @@
         <span style="font-size:.72rem;color:var(--text-muted);flex-shrink:0">Buffer:</span>
         <select id="play-buffer-select" onchange="_onBufferChange()"
                 style="font-size:.72rem;height:28px;padding:.1rem .5rem;flex:1">
-          <option value="0">Auto (sin buffer extra)</option>
-          <option value="3">Bajo · ~3 s</option>
+          <option value="0">Auto (mínima latencia, más cortes)</option>
+          <option value="3" selected>Bajo · ~3 s</option>
           <option value="8">Medio · ~8 s</option>
           <option value="15">Alto · ~15 s</option>
         </select>
@@ -3964,13 +3964,23 @@ function _buildProxyUrl(hash) {
 let _mpegtsPlayer   = null;
 let _playContext    = null;
 let _epgTimer       = null;
-let _bufferSeconds  = +localStorage.getItem('play_buffer_s') || 0;
+// Default to a small buffer (not 0/"Auto") — with 0, mpegts.js's live-chasing
+// used to force a seek the instant buffered-ahead passed 1.5s, snapping back
+// down to 0.5s. acexy's P2P relay delivers in bursts rather than a steady CBR
+// trickle, so that 1s window got crossed constantly — every chase-seek is a
+// visible stutter, which is exactly the "cuts every 2-3s, then keeps playing"
+// pattern. "!== null" (not "||") so an explicitly-saved Auto (0) is honored —
+// only a first visit with nothing in localStorage falls back to 3.
+const _storedBufferS = localStorage.getItem('play_buffer_s');
+let _bufferSeconds = _storedBufferS !== null ? +_storedBufferS : 3;
 
 function _mpegtsConfig(bufSec) {
   if (!bufSec) {
+    // "Auto" is still the tightest preset (lowest latency), just less
+    // trigger-happy than before — see the comment above _bufferSeconds.
     return { enableWorker: true, enableStashBuffer: true, stashInitialSize: 384,
              liveBufferLatencyChasing: true,
-             liveBufferLatencyMaxLatency: 1.5, liveBufferLatencyMinRemain: 0.5 };
+             liveBufferLatencyMaxLatency: 3, liveBufferLatencyMinRemain: 1.5 };
   }
   return {
     enableWorker: true,
