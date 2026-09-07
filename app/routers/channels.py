@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app import crud, schemas
-from app.scraper import _parse_xmltv_dt
+from app.scraper import _parse_xmltv_dt, get_epg_now_next
 
 EPG_FILE = os.getenv("EPG_FILE", "./data/epg.xml")
 
@@ -98,6 +98,14 @@ async def bulk_update_groups(data: schemas.BulkChannelGroupsUpdate, db: AsyncSes
         if ch:
             updated.append(ch)
     return updated
+
+
+@router.get("/epg-guide")
+async def channels_epg_guide(db: AsyncSession = Depends(get_db)):
+    """Current + next EPG programme per channel tvg_id (Hashes tab section headers)."""
+    channels = await crud.get_channels(db)
+    tvg_ids = {ch.tvg_id for ch in channels if ch.tvg_id}
+    return await asyncio.to_thread(get_epg_now_next, tvg_ids, EPG_FILE)
 
 
 @router.post("/{channel_id}/logo", response_model=schemas.ChannelOut)

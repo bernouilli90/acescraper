@@ -804,9 +804,6 @@
             <th style="cursor:pointer;user-select:none" onclick="sortSources('label')">
               Etiqueta <span id="sort-label" style="color:var(--text-dim)">⇅</span>
             </th>
-            <th style="cursor:pointer;user-select:none" onclick="sortSources('channel')">
-              Canal vinculado <span id="sort-channel" style="color:var(--text-dim)">⇅</span>
-            </th>
             <th>Grupos</th>
             <th style="width:90px">Estado</th>
             <th style="width:80px">Test</th>
@@ -815,7 +812,7 @@
           </tr>
         </thead>
         <tbody id="sources-tbody">
-          <tr class="empty-row"><td colspan="9">Cargando…</td></tr>
+          <tr class="empty-row"><td colspan="8">Cargando…</td></tr>
         </tbody>
       </table>
     </div>
@@ -1753,7 +1750,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadAll() {
-  await Promise.all([loadChannels(), loadSources(), loadGroups(), loadFeeds(), loadConfig(), loadXmltvSources()]);
+  await Promise.all([loadChannels(), loadSources(), loadGroups(), loadFeeds(), loadConfig(), loadXmltvSources(), loadEpgGuide()]);
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -1763,6 +1760,7 @@ function switchTab(name) {
   if (name === 'config') { loadScheduler(); loadStreamTest(); loadEpg(); }
   if (name === 'export') loadExportProfiles();
   if (name === 'feeds')  { loadXmltvSources(); }
+  if (name === 'sources') loadEpgGuide();  // refresh "ahora / luego" al reabrir la pestaña
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
@@ -2367,6 +2365,16 @@ function inlineEditLabel(sourceId) {
 let srcSort = { col: null, dir: 1 };  // dir: 1=asc, -1=desc
 let selectedChannels = new Set();     // ids of selected channel rows
 let selectedSources = new Set();      // ids of selected rows
+let srcCollapsed = new Set();         // section keys (channel id, or '__unassigned__') currently collapsed
+let _lastSourceList = [];             // last filtered+sorted list, kept to re-render on section toggle
+let epgGuide = {};                    // tvg_id -> {current, next}
+
+async function loadEpgGuide() {
+  try {
+    epgGuide = await api('GET', '/api/channels/epg-guide');
+    filterSources();
+  } catch (e) { /* EPG opcional: si falla, las secciones simplemente no muestran programación */ }
+}
 
 async function loadSources() {
   sources = await api('GET', '/api/sources/?limit=5000');
@@ -2471,16 +2479,13 @@ function filterSources() {
     return true;
   });
 
-  // Apply current sort
+  // Apply current sort (within each channel section — sections themselves are
+  // always ordered alphabetically by channel name, see renderSources())
   if (srcSort.col) {
     list = [...list].sort((a, b) => {
       let va, vb;
       if (srcSort.col === 'ace_hash') { va = a.ace_hash; vb = b.ace_hash; }
       else if (srcSort.col === 'label') { va = (a.label||'').toLowerCase(); vb = (b.label||'').toLowerCase(); }
-      else if (srcSort.col === 'channel') {
-        va = (channels.find(c => c.id === a.channel_id)?.name || '').toLowerCase();
-        vb = (channels.find(c => c.id === b.channel_id)?.name || '').toLowerCase();
-      }
       return va < vb ? -srcSort.dir : va > vb ? srcSort.dir : 0;
     });
   }
@@ -2496,7 +2501,7 @@ function sortSources(col) {
     srcSort.dir = 1;
   }
   // Update header indicators
-  ['ace_hash', 'label', 'channel'].forEach(c => {
+  ['ace_hash', 'label'].forEach(c => {
     const el = document.getElementById('sort-' + c);
     if (el) el.textContent = c === srcSort.col ? (srcSort.dir === 1 ? '↑' : '↓') : '⇅';
   });
@@ -2622,7 +2627,7 @@ function clearSourceFilters() {
   document.getElementById('src-f-feed').value    = '';
   document.getElementById('src-f-group').value   = '';
   srcSort = { col: null, dir: 1 };
-  ['ace_hash', 'label', 'channel'].forEach(c => {
+  ['ace_hash', 'label'].forEach(c => {
     const el = document.getElementById('sort-' + c);
     if (el) el.textContent = '⇅';
   });
@@ -2749,6 +2754,7 @@ function skipValidation() {
 
 function renderSources(list) {
   const tbody = document.getElementById('sources-tbody');
+  _lastSourceList = list;
 
   // Update counter
   const counter = document.getElementById('src-counter');
@@ -2759,26 +2765,94 @@ function renderSources(list) {
   counter.className   = shown < base ? 'badge badge-yellow' : 'badge badge-gray';
 
   if (!list.length) {
-    const msg = total === 0
+    const msg = sources.length === 0
       ? 'Sin hashes. Importa un archivo M3U o una URL.'
       : 'Sin resultados para los filtros aplicados.';
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${msg}</td></tr>`;
     updateSelectAll();
     return;
   }
 
-  tbody.innerHTML = list.map(s => {
-    const ch   = channels.find(c => c.id === s.channel_id);
-    const feed = feeds.find(f => f.id === s.feed_url_id);
-    const feedLabel = feed
-      ? (feed.label || (feed.url.length > 22 ? feed.url.slice(0, 22) + '…' : feed.url))
-      : null;
-    const chGroups = ch?.groups || [];
-    const groupsHtml = chGroups.length
-      ? chGroups.map(g => `<span class="badge badge-blue" style="font-size:.7rem">${esc(g.name)}</span>`).join(' ')
-      : '<span style="color:var(--text-dim);font-size:.75rem">—</span>';
-    const checked = selectedSources.has(s.id) ? 'checked' : '';
-    return `<tr id="src-row-${s.id}" class="${selectedSources.has(s.id) ? 'row-selected' : ''}">
+  // Group by assigned channel — unassigned first, then channels A→Z.
+  const groups = new Map();  // key -> { channel: ch|null, rows: [] }
+  for (const s of list) {
+    const key = s.channel_id != null ? String(s.channel_id) : '__unassigned__';
+    if (!groups.has(key)) {
+      groups.set(key, { channel: s.channel_id != null ? channels.find(c => c.id === s.channel_id) : null, rows: [] });
+    }
+    groups.get(key).rows.push(s);
+  }
+  const orderedKeys = [...groups.keys()].sort((a, b) => {
+    if (a === '__unassigned__') return -1;
+    if (b === '__unassigned__') return 1;
+    const na = groups.get(a).channel?.name || '';
+    const nb = groups.get(b).channel?.name || '';
+    return na.localeCompare(nb, 'es', { sensitivity: 'base' });
+  });
+
+  tbody.innerHTML = orderedKeys.map(key => {
+    const grp = groups.get(key);
+    const collapsed = srcCollapsed.has(key);
+    const header = renderSourceSectionHeader(key, grp, collapsed);
+    const rows = collapsed ? '' : grp.rows.map(renderSourceRow).join('');
+    return header + rows;
+  }).join('');
+
+  updateSelectAll();
+}
+
+function renderSourceSectionHeader(key, grp, collapsed) {
+  const ch    = grp.channel;
+  const count = grp.rows.length;
+  const arrow = collapsed ? '▸' : '▾';
+  const title = ch
+    ? `<strong>${esc(ch.name)}</strong> <span style="color:var(--text-dim);font-size:.72rem">— ${esc(ch.tvg_id)}</span>`
+    : `<strong style="color:var(--text-muted)">Sin canal asignado</strong>`;
+  return `<tr class="src-section-row" onclick="toggleSourceSection('${key}')"
+             style="cursor:pointer;background:var(--surface2)">
+    <td colspan="8" style="padding:.55rem .75rem">
+      <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+        <span style="color:var(--text-dim);display:inline-block;width:.9rem">${arrow}</span>
+        ${title}
+        <span class="badge badge-gray" style="font-size:.65rem">${count} hash${count !== 1 ? 'es' : ''}</span>
+        ${ch ? epgSummaryHtml(ch.tvg_id) : ''}
+      </div>
+    </td>
+  </tr>`;
+}
+
+function epgSummaryHtml(tvgId) {
+  const g = epgGuide[tvgId];
+  if (!g || (!g.current && !g.next)) return '';
+  let html = '';
+  if (g.current) {
+    const stop = new Date(g.current.stop).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    html += `<span style="font-size:.72rem;color:var(--text-muted)">▶ <strong>${esc(g.current.title)}</strong> · hasta ${stop}</span>`;
+  }
+  if (g.next) {
+    const start = new Date(g.next.start).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    html += `<span style="font-size:.72rem;color:var(--text-dim)">· Luego: ${esc(g.next.title)} · ${start}</span>`;
+  }
+  return html;
+}
+
+function toggleSourceSection(key) {
+  srcCollapsed.has(key) ? srcCollapsed.delete(key) : srcCollapsed.add(key);
+  renderSources(_lastSourceList);
+}
+
+function renderSourceRow(s) {
+  const ch   = channels.find(c => c.id === s.channel_id);
+  const feed = feeds.find(f => f.id === s.feed_url_id);
+  const feedLabel = feed
+    ? (feed.label || (feed.url.length > 22 ? feed.url.slice(0, 22) + '…' : feed.url))
+    : null;
+  const chGroups = ch?.groups || [];
+  const groupsHtml = chGroups.length
+    ? chGroups.map(g => `<span class="badge badge-blue" style="font-size:.7rem">${esc(g.name)}</span>`).join(' ')
+    : '<span style="color:var(--text-dim);font-size:.75rem">—</span>';
+  const checked = selectedSources.has(s.id) ? 'checked' : '';
+  return `<tr id="src-row-${s.id}" class="${selectedSources.has(s.id) ? 'row-selected' : ''}">
       <td style="text-align:center">
         <input type="checkbox" class="src-chk" data-id="${s.id}" ${checked}
                onchange="toggleSource(${s.id}, this.checked)" style="cursor:pointer"/>
@@ -2790,9 +2864,6 @@ function renderSources(list) {
           ? esc(s.label)
           : '<span style="color:var(--text-dim)">—</span>'}</span>
       </td>
-      <td>${ch
-        ? `<span class="badge badge-green">${esc(ch.name)}</span>`
-        : `<span class="badge badge-gray">sin vincular</span>`}</td>
       <td>${groupsHtml}</td>
       <td>${s.deleted
         ? '<span class="badge badge-red">Eliminado</span>'
@@ -2816,9 +2887,6 @@ function renderSources(list) {
         </div>
       </td>
     </tr>`;
-  }).join('');
-
-  updateSelectAll();
 }
 
 function importMsg(r) {

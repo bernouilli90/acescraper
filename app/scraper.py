@@ -255,6 +255,54 @@ def _parse_xmltv_dt(s: str) -> Optional[datetime]:
         return None
 
 
+def get_epg_now_next(tvg_ids: set[str], epg_file: str) -> dict:
+    """Return {tvg_id: {"current": programme|None, "next": programme|None}}.
+
+    Scans the EPG file once for all requested tvg_ids (shared by the group guide,
+    the channels EPG-guide endpoint, and anywhere else that needs a quick "on now /
+    up next" summary rather than the full schedule).
+    """
+    if not tvg_ids or not os.path.exists(epg_file):
+        return {}
+    now = datetime.now(timezone.utc)
+    buckets: dict[str, list] = {tid: [] for tid in tvg_ids}
+    try:
+        for _, elem in etree.iterparse(epg_file, events=("end",), tag="programme", recover=True):
+            cid = elem.get("channel", "")
+            if cid in tvg_ids:
+                start = _parse_xmltv_dt(elem.get("start", ""))
+                stop  = _parse_xmltv_dt(elem.get("stop",  ""))
+                if start and stop and stop >= now:
+                    title_el = elem.find("title")
+                    desc_el  = elem.find("desc")
+                    buckets[cid].append({
+                        "title": title_el.text if title_el is not None else "",
+                        "start": start.isoformat(),
+                        "stop":  stop.isoformat(),
+                        "desc":  desc_el.text if desc_el is not None else None,
+                    })
+            parent = elem.getparent()
+            elem.clear()
+            if parent is not None:
+                parent.remove(elem)
+    except Exception:
+        pass
+    result = {}
+    for tvg_id, progs in buckets.items():
+        # Sort by start time so current/next selection is deterministic
+        progs.sort(key=lambda p: p["start"])
+        current = next_prog = None
+        for p in progs:
+            p_start = datetime.fromisoformat(p["start"])
+            p_stop  = datetime.fromisoformat(p["stop"])
+            if p_start <= now < p_stop:
+                current = p
+            elif p_start > now and next_prog is None:
+                next_prog = p
+        result[tvg_id] = {"current": current, "next": next_prog}
+    return result
+
+
 def _parse_url_to_files(
     src_path: str,
     tvg_ids: set[str],
