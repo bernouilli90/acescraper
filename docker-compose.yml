@@ -15,6 +15,7 @@ services:
       DATABASE_URL: sqlite+aiosqlite:////data/acescraper.db
       LOGOS_DIR: /data/logos
       EPG_FILE: /data/epg.xml
+      TZ: ${TZ:-Europe/Madrid}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       #TELEGRAM_ALLOWED_USERS: ${TELEGRAM_ALLOWED_USERS:-}
     healthcheck:
