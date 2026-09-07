@@ -111,6 +111,10 @@
       border-radius: 8px;
       overflow: hidden;
     }
+    /* The validation card hosts a SearchableSelect dropdown that must be able to
+       spill past its bottom edge — .card's overflow:hidden (for rounded corners)
+       would otherwise clip it. */
+    #val-review-card { overflow: visible; }
     .card-body { padding: 1.25rem; }
     .card-title {
       font-size: 0.7rem;
