@@ -4140,9 +4140,16 @@ function _startStream(hash) {
     document.getElementById('play-overlay-text').textContent = `Error: sin conexión (${detail})`;
   };
 
+  // Absolute URL, not relative — enableWorker runs the loader inside a Web
+  // Worker, which doesn't share the page's base URI, so a relative path like
+  // `/api/stream/...` fails to parse ("Failed to execute 'fetch' on
+  // 'WorkerGlobalScope': Failed to parse URL") the instant it tries to fetch,
+  // before any real request even goes out — that's the "instant" error.
+  const streamUrl = new URL(`/api/stream/${hash}`, window.location.origin).href;
+
   if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
     _mpegtsPlayer = mpegts.createPlayer(
-      { type: 'mpegts', isLive: true, url: `/api/stream/${hash}` },
+      { type: 'mpegts', isLive: true, url: streamUrl },
       _mpegtsConfig(_bufferSeconds)
     );
     _mpegtsPlayer.attachMediaElement(video);
@@ -4155,7 +4162,7 @@ function _startStream(hash) {
         `Error (${errType}): ${details?.msg || details?.code || 'sin conexión'}`;
     });
   } else {
-    video.src = `/api/stream/${hash}`;
+    video.src = streamUrl;
     video.play().catch(e => console.error('[player] video.play() rejected', e));
   }
 }
