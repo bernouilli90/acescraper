@@ -87,6 +87,9 @@ class ValidationQueueItem(BaseModel):
     ace_hash: str
     label: Optional[str] = None
     channel: Optional[ValidationChannelInfo] = None
+    test_status: str = "untested"
+    test_last_run: Optional[datetime] = None
+    fail_since: Optional[datetime] = None
     model_config = {"from_attributes": True}
 
 class ValidationQueueResponse(BaseModel):

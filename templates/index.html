@@ -852,6 +852,13 @@
           <p id="val-label" style="padding:.45rem .75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text-muted)"></p>
         </div>
         <div>
+          <label class="field-label">Último test</label>
+          <div style="display:flex;align-items:center;gap:.6rem">
+            <span id="val-test-badge"></span>
+            <button class="btn btn-ghost btn-sm" onclick="playValidationHash()">▶ Reproducir</button>
+          </div>
+        </div>
+        <div>
           <label class="field-label">Canal asignado <span style="font-weight:400;color:var(--text-dim)">(clic para cambiar)</span></label>
           <div id="val-channel-display" onclick="openValChannelPicker()"
                style="cursor:pointer;padding:.55rem .75rem;background:var(--surface2);border:1px solid var(--border2);border-radius:6px"></div>
@@ -2695,8 +2702,14 @@ function updateValCounterFromRemaining(remaining) {
 function renderValItem() {
   document.getElementById('val-hash').textContent  = valCurrent.ace_hash;
   document.getElementById('val-label').textContent = valCurrent.label || '—';
+  document.getElementById('val-test-badge').innerHTML = testBadge(valCurrent);
   renderValChannelDisplay();
   document.getElementById('val-accept-btn').style.display = valCurrent.channel ? '' : 'none';
+}
+
+function playValidationHash() {
+  if (!valCurrent) return;
+  openPlayModal(valCurrent.id, valCurrent.ace_hash);
 }
 
 function renderValChannelDisplay() {
