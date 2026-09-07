@@ -2711,7 +2711,7 @@ async function confirmValChannel() {
   try {
     await api('PATCH', `/api/sources/${valCurrent.id}/validate`, { channel_id: +channelId });
     await Promise.all([loadSources(), loadChannels()]);
-    await loadNextValidation();
+    await loadNextValidation(valLastId);
   } catch(e) { alert(e.message); }
 }
 
@@ -2720,7 +2720,7 @@ async function acceptValidation() {
   try {
     await api('PATCH', `/api/sources/${valCurrent.id}/validate`, {});
     await loadSources();
-    await loadNextValidation();
+    await loadNextValidation(valLastId);
   } catch(e) { alert(e.message); }
 }
 
