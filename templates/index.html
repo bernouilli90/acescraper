@@ -330,8 +330,6 @@
       color: var(--accent);
     }
 
-    .grid-import { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-    @media (min-width: 768px) { .grid-import { grid-template-columns: repeat(3, 1fr); } }
     .grid-2 { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
     @media (min-width: 640px) { .grid-2 { grid-template-columns: 2fr 1fr; } }
 
@@ -763,31 +761,6 @@
                   style="height:36px;white-space:nowrap" title="Limpiar filtros">✕ Limpiar</button>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- Import panel -->
-  <div class="card">
-    <div class="card-body">
-      <p class="card-title">Importar hashes</p>
-      <div class="grid-import">
-        <div class="space-s">
-          <label class="field-label">Pegar texto (M3U, lista…)</label>
-          <textarea id="import-text" rows="4" placeholder="Pega aquí contenido con hashes acestream…"></textarea>
-          <button class="btn btn-accent" style="width:100%" onclick="importText()">Extraer hashes</button>
-        </div>
-        <div class="space-s">
-          <label class="field-label">Subir archivo</label>
-          <input id="import-file" type="file" accept=".m3u,.txt,.m3u8"/>
-          <button class="btn btn-accent" style="width:100%;margin-top:.5rem" onclick="importFile()">Subir archivo</button>
-        </div>
-        <div class="space-s">
-          <label class="field-label">Importar desde URL</label>
-          <input id="import-url" type="url" placeholder="https://ejemplo.com/lista.m3u"/>
-          <button class="btn btn-accent" style="width:100%;margin-top:.5rem" onclick="importUrl()">Importar desde URL</button>
-        </div>
-      </div>
-      <p id="import-result" class="success-msg" style="margin-top:.75rem"></p>
     </div>
   </div>
 
@@ -2939,37 +2912,6 @@ function importMsg(r) {
   let msg = `✓ Encontrados: ${r.total_found}  Nuevos: ${r.new_hashes}  Duplicados: ${r.duplicates}`;
   if (r.auto_mapped > 0) msg += `  Vinculados automáticamente: ${r.auto_mapped}`;
   return msg;
-}
-
-async function importText() {
-  const fd = new FormData();
-  fd.append('text', document.getElementById('import-text').value);
-  try {
-    const r = await api('POST', '/api/sources/import/text', fd);
-    document.getElementById('import-result').textContent = importMsg(r);
-    await Promise.all([loadSources(), loadChannels()]);
-  } catch(e) { alert(e.message); }
-}
-
-async function importFile() {
-  const file = document.getElementById('import-file').files[0];
-  if (!file) return;
-  const fd = new FormData(); fd.append('file', file);
-  try {
-    const r = await api('POST', '/api/sources/import/file', fd);
-    document.getElementById('import-result').textContent = importMsg(r);
-    await Promise.all([loadSources(), loadChannels()]);
-  } catch(e) { alert(e.message); }
-}
-
-async function importUrl() {
-  const fd = new FormData();
-  fd.append('url', document.getElementById('import-url').value.trim());
-  try {
-    const r = await api('POST', '/api/sources/import/url', fd);
-    document.getElementById('import-result').textContent = importMsg(r);
-    await Promise.all([loadSources(), loadChannels()]);
-  } catch(e) { alert(e.message); }
 }
 
 function openMapModal(sourceId, hash) {
