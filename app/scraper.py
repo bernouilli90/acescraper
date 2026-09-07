@@ -158,10 +158,26 @@ async def refresh_all_feeds(db: AsyncSession):
 
 async def test_stream(ace_hash: str, acexy_ip: str, acexy_port: int) -> bool:
     url = f"http://{acexy_ip}:{acexy_port}/ace/getstream?id={ace_hash}"
+    # connect/write/pool cortos, pero el arranque real del motor Acestream (P2P)
+    # puede tardar bastante en mandar el primer byte incluso cuando el stream sí
+    # funciona — visto en producción hasta 10-20s — así que el read no se limita
+    # tanto como el resto de fases.
+    timeout = httpx.Timeout(connect=10.0, read=25.0, write=10.0, pool=10.0)
     try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             async with client.stream("GET", url) as r:
-                return r.status_code < 400
+                if r.status_code >= 400:
+                    return False
+                # acexy a veces responde 200 igual que un stream real pero con un
+                # mensaje de texto plano en el cuerpo (motor Acestream que no llega
+                # a arrancar la sesión a tiempo) — el proxy de reproducción ya lo
+                # detecta exigiendo el byte de sincronismo MPEG-TS (0x47) como
+                # primer byte; el test tiene que exigir lo mismo, si no un canal
+                # roto se queda marcado "ok" (solo por el 200) y falla al
+                # reproducirlo — justo lo contrario de para qué sirve el test.
+                async for chunk in r.aiter_bytes(1):
+                    return chunk.startswith(b"\x47")
+                return False
     except Exception:
         return False
 
