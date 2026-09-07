@@ -4128,9 +4128,16 @@ function _startStream(hash) {
   video.onpause   = _updatePlayPauseIcon;
   // Assignment instead of addEventListener avoids listener accumulation on rapid stream switches
   video.onplaying = () => { overlay.style.display = 'none'; _updatePlayPauseIcon(); };
-  video.onerror   = () => {
+  // Native MediaError codes aren't self-explanatory in the UI text, so surface
+  // them — this is what actually lets us tell "genuinely can't connect" apart
+  // from e.g. a decode/format error, instead of a single generic phrase.
+  const MEDIA_ERR_NAMES = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' };
+  video.onerror = () => {
     overlay.style.display = 'flex';
-    document.getElementById('play-overlay-text').textContent = 'Error: sin conexión';
+    const err = video.error;
+    console.error('[player] video.onerror', err);
+    const detail = err ? (MEDIA_ERR_NAMES[err.code] || err.code) + (err.message ? ': ' + err.message : '') : 'desconocido';
+    document.getElementById('play-overlay-text').textContent = `Error: sin conexión (${detail})`;
   };
 
   if (typeof mpegts !== 'undefined' && mpegts.getFeatureList().mseLivePlayback) {
@@ -4141,13 +4148,15 @@ function _startStream(hash) {
     _mpegtsPlayer.attachMediaElement(video);
     _mpegtsPlayer.load();
     _mpegtsPlayer.play();
-    _mpegtsPlayer.on(mpegts.Events.ERROR, (_t, d) => {
+    _mpegtsPlayer.on(mpegts.Events.ERROR, (errType, details) => {
       overlay.style.display = 'flex';
-      document.getElementById('play-overlay-text').textContent = 'Error: ' + (d?.msg || 'sin conexión');
+      console.error('[player] mpegts ERROR', errType, details);
+      document.getElementById('play-overlay-text').textContent =
+        `Error (${errType}): ${details?.msg || details?.code || 'sin conexión'}`;
     });
   } else {
     video.src = `/api/stream/${hash}`;
-    video.play().catch(() => {});
+    video.play().catch(e => console.error('[player] video.play() rejected', e));
   }
 }
 
