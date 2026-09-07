@@ -4134,8 +4134,21 @@ function _startStream(hash) {
   const video   = document.getElementById('play-video');
   const overlay = document.getElementById('play-overlay');
 
-  // Teardown previous player before reusing the video element
+  // Teardown previous player before reusing the video element. destroy() alone
+  // does NOT unload()/detachMediaElement() first (confirmed in mpegts.js's own
+  // source — it just nulls its references) — skipping that step can leave the
+  // old worker still mid-flight (still demuxing/appending to the SAME
+  // MediaSource) when the new player attaches, so for a moment two producers
+  // fight over one SourceBuffer. That's consistent with two separate
+  // transmuxer workers showing up in the console back to back on a single
+  // Play, and would keep corrupting playback well past startup — not just a
+  // one-off glitch — matching stutters recurring throughout the whole session.
   if (_mpegtsPlayer) {
+    try {
+      _mpegtsPlayer.pause();
+      _mpegtsPlayer.unload();
+      _mpegtsPlayer.detachMediaElement();
+    } catch (e) { console.warn('[player] teardown of previous player failed', e); }
     _mpegtsPlayer.destroy();
     _mpegtsPlayer = null;
   }
@@ -4315,7 +4328,11 @@ function switchStream(sourceId, hash) {
 }
 
 function closePlayModal() {
-  if (_mpegtsPlayer)  { _mpegtsPlayer.destroy(); _mpegtsPlayer = null; }
+  if (_mpegtsPlayer) {
+    try { _mpegtsPlayer.pause(); _mpegtsPlayer.unload(); _mpegtsPlayer.detachMediaElement(); } catch (e) {}
+    _mpegtsPlayer.destroy();
+    _mpegtsPlayer = null;
+  }
   if (_epgTimer)      { clearInterval(_epgTimer); _epgTimer = null; }
   if (_overlayTimer)  { clearTimeout(_overlayTimer); _overlayTimer = null; }
   _playContext = null;
@@ -4335,11 +4352,27 @@ function closePlayModal() {
 
 function copyPlayUrl(elementId, btn) {
   const text = document.getElementById(elementId).textContent;
-  navigator.clipboard.writeText(text).then(() => {
+  const flash = () => {
     const orig = btn.textContent;
     btn.textContent = '✓';
     setTimeout(() => btn.textContent = orig, 1400);
-  }).catch(() => {});
+  };
+  // navigator.clipboard only exists in a secure context (HTTPS or localhost) —
+  // plain HTTP on a LAN IP (this app's typical deployment) doesn't have it at
+  // all, so accessing .writeText threw synchronously instead of just failing
+  // the copy. Fall back to the old execCommand trick, which still works there.
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(flash).catch(() => {});
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); flash(); } catch (e) {}
+  document.body.removeChild(ta);
 }
 
 // ── Export Profiles ───────────────────────────────────────────────────────────
