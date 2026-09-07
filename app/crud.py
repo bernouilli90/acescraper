@@ -165,6 +165,9 @@ async def bulk_create_sources(
         existing = existing_by_hash.get(h)
         if existing:
             dup_count += 1
+            # Excluded hashes were deliberately deleted to never come back — leave them untouched.
+            if existing.excluded:
+                continue
             if existing.channel_id is None and channel_id is not None:
                 existing.channel_id = channel_id
                 mapped_count += 1
@@ -203,11 +206,14 @@ async def update_source(db: AsyncSession, source_id: int, data: schemas.SourceUp
     return source
 
 
-async def delete_source(db: AsyncSession, source_id: int):
+async def delete_source(db: AsyncSession, source_id: int, exclude: bool = False):
+    values: dict = {"deleted": True}
+    if exclude:
+        values["excluded"] = True
     await db.execute(
         update(models.Source)
         .where(models.Source.id == source_id)
-        .values(deleted=True)
+        .values(**values)
     )
     await db.commit()
 

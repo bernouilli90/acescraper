@@ -123,8 +123,8 @@ async def bulk_restore_sources(ids: list[int], db: AsyncSession = Depends(get_db
 
 
 @router.delete("/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_source(source_id: int, db: AsyncSession = Depends(get_db)):
-    await crud.delete_source(db, source_id)
+async def delete_source(source_id: int, exclude: bool = False, db: AsyncSession = Depends(get_db)):
+    await crud.delete_source(db, source_id, exclude=exclude)
 
 
 @router.post("/{source_id}/restore", status_code=status.HTTP_200_OK)

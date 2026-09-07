@@ -863,6 +863,8 @@
       </div>
       <div class="modal-footer" style="justify-content:flex-start">
         <button class="btn btn-ghost btn-sm" onclick="skipValidation()">Saltar por ahora</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteValidationHash(false)">Eliminar hash</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteValidationHash(true)">Eliminar hash y excluir</button>
         <button id="val-accept-btn" class="btn btn-primary" onclick="acceptValidation()">✓ Aceptar asignación</button>
       </div>
     </div>
@@ -2719,6 +2721,19 @@ async function acceptValidation() {
   if (!valCurrent || !valCurrent.channel) return;
   try {
     await api('PATCH', `/api/sources/${valCurrent.id}/validate`, {});
+    await loadSources();
+    await loadNextValidation(valLastId);
+  } catch(e) { alert(e.message); }
+}
+
+async function deleteValidationHash(exclude) {
+  if (!valCurrent) return;
+  const msg = exclude
+    ? '¿Eliminar este hash y excluirlo para que no se vuelva a importar automáticamente?'
+    : '¿Eliminar este hash?';
+  if (!confirm(msg)) return;
+  try {
+    await api('DELETE', `/api/sources/${valCurrent.id}${exclude ? '?exclude=true' : ''}`);
     await loadSources();
     await loadNextValidation(valLastId);
   } catch(e) { alert(e.message); }

@@ -35,6 +35,7 @@ async def init_db():
             "ALTER TABLE sources ADD COLUMN fail_since DATETIME",
             "ALTER TABLE sources ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT 0",
             "ALTER TABLE sources ADD COLUMN validated BOOLEAN NOT NULL DEFAULT 0",
+            "ALTER TABLE sources ADD COLUMN excluded BOOLEAN NOT NULL DEFAULT 0",
             "ALTER TABLE channels ADD COLUMN custom_logo TEXT",
             "ALTER TABLE channel_group ADD COLUMN position INTEGER DEFAULT 0",
         ]:

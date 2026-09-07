@@ -60,6 +60,7 @@ class Source(Base):
     fail_since = Column(DateTime(timezone=True), nullable=True)
     deleted = Column(Boolean, default=False, nullable=False)
     validated = Column(Boolean, default=False, nullable=False)
+    excluded = Column(Boolean, default=False, nullable=False)  # never re-mapped by future imports
 
     channel = relationship("Channel", back_populates="sources")
     feed_url = relationship("FeedUrl", back_populates="sources")

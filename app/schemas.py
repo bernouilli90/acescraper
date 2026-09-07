@@ -70,6 +70,7 @@ class SourceOut(SourceBase):
     fail_since: Optional[datetime] = None
     deleted: bool = False
     validated: bool = False
+    excluded: bool = False
     model_config = {"from_attributes": True}
 
 
