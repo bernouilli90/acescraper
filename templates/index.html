@@ -2805,18 +2805,37 @@ function renderSourceSectionHeader(key, grp, collapsed) {
   const ch    = grp.channel;
   const count = grp.rows.length;
   const arrow = collapsed ? '▸' : '▾';
-  const title = ch
+
+  const nameLine = ch
     ? `<strong>${esc(ch.name)}</strong> <span style="color:var(--text-dim);font-size:.72rem">— ${esc(ch.tvg_id)}</span>`
     : `<strong style="color:var(--text-muted)">Sin canal asignado</strong>`;
+  const countBadge = `<span class="badge badge-gray" style="font-size:.65rem">${count} hash${count !== 1 ? 'es' : ''}</span>`;
+
+  // Collapsed: just the name line, no logo, no EPG — expanded: logo spans both lines.
+  let logoHtml = '';
+  let epgLine  = '';
+  if (ch && !collapsed) {
+    const logoSrc = _effectiveLogo(ch);
+    logoHtml = logoSrc
+      ? `<img src="${esc(logoSrc)}" alt="" style="width:40px;height:40px;border-radius:4px;object-fit:contain;background:var(--surface2);flex-shrink:0" onerror="this.style.display='none'">`
+      : `<div style="width:40px;height:40px;border-radius:4px;background:var(--surface2);flex-shrink:0"></div>`;
+    epgLine = `<div style="margin-top:.3rem">${epgSummaryHtml(ch.tvg_id)}</div>`;
+  }
+
   return `<tr class="src-section-row" onclick="toggleSourceSection('${key}')"
              style="cursor:pointer;background:var(--surface2)">
     <td colspan="8" style="padding:.55rem .75rem">
-      <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-        <span style="color:var(--text-dim);display:inline-block;width:.9rem">${arrow}</span>
-        ${title}
-        <span class="badge badge-gray" style="font-size:.65rem">${count} hash${count !== 1 ? 'es' : ''}</span>
+      <div style="display:flex;align-items:center;gap:.55rem">
+        <span style="color:var(--text-dim);display:inline-block;width:.9rem;flex-shrink:0">${arrow}</span>
+        ${logoHtml}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+            ${nameLine}
+            ${countBadge}
+          </div>
+          ${epgLine}
+        </div>
       </div>
-      ${ch ? `<div style="margin:.3rem 0 0 1.45rem">${epgSummaryHtml(ch.tvg_id)}</div>` : ''}
     </td>
   </tr>`;
 }
