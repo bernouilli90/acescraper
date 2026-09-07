@@ -694,6 +694,8 @@
     <h2 class="section-title">Hashes Acestream</h2>
     <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
       <span id="src-counter" class="badge badge-gray" style="font-size:.75rem"></span>
+      <button class="btn btn-ghost btn-sm" onclick="collapseAllSections()">▸ Colapsar todo</button>
+      <button class="btn btn-ghost btn-sm" onclick="expandAllSections()">▾ Expandir todo</button>
       <div id="bulk-bar" style="display:none;align-items:center;gap:.5rem">
         <span id="bulk-count" style="font-size:.8rem;color:var(--text-muted)"></span>
         <button id="bulk-assign-btn" class="btn btn-accent btn-sm" onclick="openBulkAssignModal()">Asignar canal</button>
@@ -2859,6 +2861,16 @@ function epgSummaryHtml(tvgId) {
 
 function toggleSourceSection(key) {
   srcCollapsed.has(key) ? srcCollapsed.delete(key) : srcCollapsed.add(key);
+  renderSources(_lastSourceList);
+}
+
+function collapseAllSections() {
+  srcCollapsed = new Set(_lastSourceList.map(s => s.channel_id != null ? String(s.channel_id) : '__unassigned__'));
+  renderSources(_lastSourceList);
+}
+
+function expandAllSections() {
+  srcCollapsed.clear();
   renderSources(_lastSourceList);
 }
 
