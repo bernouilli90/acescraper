@@ -783,7 +783,7 @@
             <th>Grupos</th>
             <th style="width:90px">Estado</th>
             <th style="width:80px">Test</th>
-            <th style="width:90px">Feed</th>
+            <th style="width:90px">Origen</th>
             <th style="min-width:240px">Acciones</th>
           </tr>
         </thead>
@@ -2921,7 +2921,7 @@ function renderSourceRow(s) {
       <td>${testBadge(s)}</td>
       <td>${feedLabel
         ? `<span class="badge badge-blue" title="${esc(feed.url)}" style="font-size:.65rem;max-width:90px;overflow:hidden;text-overflow:ellipsis;display:inline-block;white-space:nowrap">${esc(feedLabel)}</span>`
-        : '<span style="color:var(--text-dim);font-size:.75rem">—</span>'}</td>
+        : '<span class="badge badge-orange" title="Añadido a mano: pegado, subido o por URL, no viene de un Feed URL con auto-actualización" style="font-size:.65rem">Manual</span>'}</td>
       <td style="white-space:nowrap">
         <div style="display:inline-flex;gap:.4rem;align-items:center">
           ${s.deleted ? `
