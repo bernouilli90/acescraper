@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update, or_
+from sqlalchemy import select, delete, update, or_, func
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import selectinload
 from typing import Optional
@@ -110,7 +110,11 @@ async def get_source_by_hash(db: AsyncSession, ace_hash: str):
 
 
 async def create_source(db: AsyncSession, data: schemas.SourceCreate):
-    source = models.Source(**data.model_dump())
+    payload = data.model_dump()
+    # An explicit channel_id at creation time is a manual assignment by the caller.
+    if payload.get("channel_id") is not None:
+        payload["validated"] = True
+    source = models.Source(**payload)
     db.add(source)
     await db.commit()
     await db.refresh(source)
@@ -188,8 +192,12 @@ async def update_source(db: AsyncSession, source_id: int, data: schemas.SourceUp
     source = result.scalar_one_or_none()
     if not source:
         return None
-    for field, val in data.model_dump(exclude_none=True).items():
+    fields = data.model_dump(exclude_none=True)
+    for field, val in fields.items():
         setattr(source, field, val)
+    # Assigning a channel by hand through this endpoint counts as a manual validation.
+    if "channel_id" in fields:
+        source.validated = True
     await db.commit()
     await db.refresh(source)
     return source
@@ -294,6 +302,41 @@ async def get_sources_to_test(db: AsyncSession, statuses: list[str], limit: int 
         .limit(limit)
     )
     return result.scalars().all()
+
+
+async def get_validation_queue_next(db: AsyncSession, after_id: Optional[int] = None) -> dict:
+    """Next unvalidated, non-deleted source (lowest id first) plus how many remain in total.
+
+    `after_id` lets the UI "skip" the currently shown item without validating it: the
+    skipped source stays unvalidated and is picked up again once the queue is restarted.
+    """
+    base = (
+        select(models.Source)
+        .where(models.Source.validated.is_(False))
+        .where(models.Source.deleted.is_(False))
+    )
+    count_result = await db.execute(select(func.count()).select_from(base.subquery()))
+    remaining = count_result.scalar_one()
+
+    q = base.options(selectinload(models.Source.channel)).order_by(models.Source.id)
+    if after_id is not None:
+        q = q.where(models.Source.id > after_id)
+    result = await db.execute(q.limit(1))
+    item = result.scalar_one_or_none()
+    return {"item": item, "remaining": remaining}
+
+
+async def validate_source(db: AsyncSession, source_id: int, channel_id: Optional[int]):
+    result = await db.execute(select(models.Source).where(models.Source.id == source_id))
+    source = result.scalar_one_or_none()
+    if not source:
+        return None
+    if channel_id is not None:
+        source.channel_id = channel_id
+    source.validated = True
+    await db.commit()
+    await db.refresh(source)
+    return source
 
 
 async def bulk_delete_sources(db: AsyncSession, ids: list[int]) -> int:

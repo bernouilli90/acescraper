@@ -69,7 +69,31 @@ class SourceOut(SourceBase):
     test_last_run: Optional[datetime] = None
     fail_since: Optional[datetime] = None
     deleted: bool = False
+    validated: bool = False
     model_config = {"from_attributes": True}
+
+
+# --- Source validation queue ---
+class ValidationChannelInfo(BaseModel):
+    id: int
+    name: str
+    tvg_id: str
+    logo: Optional[str] = None
+    model_config = {"from_attributes": True}
+
+class ValidationQueueItem(BaseModel):
+    id: int
+    ace_hash: str
+    label: Optional[str] = None
+    channel: Optional[ValidationChannelInfo] = None
+    model_config = {"from_attributes": True}
+
+class ValidationQueueResponse(BaseModel):
+    item: Optional[ValidationQueueItem] = None
+    remaining: int
+
+class SourceValidateRequest(BaseModel):
+    channel_id: Optional[int] = None
 
 
 

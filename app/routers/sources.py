@@ -74,13 +74,30 @@ async def bulk_assign_sources(data: schemas.BulkAssignRequest, db: AsyncSession 
     from sqlalchemy import update
     if data.channel_id is not None and not await crud.get_channel(db, data.channel_id):
         raise HTTPException(status_code=404, detail="Channel not found")
+    # A manual bulk assignment validates the hashes; unassigning leaves them
+    # unvalidated again, since there's no channel left to have validated.
     await db.execute(
         update(models.Source)
         .where(models.Source.id.in_(data.ids))
-        .values(channel_id=data.channel_id)
+        .values(channel_id=data.channel_id, validated=data.channel_id is not None)
     )
     await db.commit()
     return {"updated": len(data.ids)}
+
+
+@router.get("/validation/next", response_model=schemas.ValidationQueueResponse)
+async def next_validation_item(after_id: int | None = None, db: AsyncSession = Depends(get_db)):
+    return await crud.get_validation_queue_next(db, after_id=after_id)
+
+
+@router.patch("/{source_id}/validate", response_model=schemas.SourceOut)
+async def validate_source(source_id: int, data: schemas.SourceValidateRequest, db: AsyncSession = Depends(get_db)):
+    if data.channel_id is not None and not await crud.get_channel(db, data.channel_id):
+        raise HTTPException(status_code=404, detail="Channel not found")
+    src = await crud.validate_source(db, source_id, data.channel_id)
+    if not src:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return src
 
 
 @router.patch("/{source_id}", response_model=schemas.SourceOut)

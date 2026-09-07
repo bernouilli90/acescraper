@@ -581,6 +581,7 @@
 <div class="tabs">
   <button class="tab-btn active" data-tab="channels">Canales</button>
   <button class="tab-btn" data-tab="sources">Hashes / Fuentes</button>
+  <button class="tab-btn" data-tab="validate">Validar canales <span id="val-tab-badge" class="badge badge-yellow" style="font-size:.65rem;display:none"></span></button>
   <button class="tab-btn" data-tab="feeds">Feed URLs</button>
   <button class="tab-btn" data-tab="groups">Grupos</button>
   <button class="tab-btn" data-tab="export">Listas M3U</button>
@@ -815,6 +816,62 @@
       </table>
     </div>
   </div>
+</section>
+
+<!-- ════════════════════════════ VALIDACIÓN DE CANALES ════════════════════════ -->
+<section id="tab-validate" class="tab-content space-y">
+
+  <div class="section-header">
+    <h2 class="section-title">Validar asignación de canales</h2>
+    <span id="val-counter" class="badge badge-gray" style="font-size:.75rem"></span>
+  </div>
+
+  <div class="card" id="val-intro-card">
+    <div class="card-body" style="text-align:center;padding:2rem">
+      <p style="color:var(--text-muted);margin-bottom:1rem">
+        Revisa uno a uno los hashes cuyo canal (asignado automáticamente por la app o sin asignar
+        todavía) no ha sido validado, y confirma o corrige el canal correcto.
+      </p>
+      <button class="btn btn-primary" onclick="startValidation()">▶ Validar asignación de canales</button>
+    </div>
+  </div>
+
+  <div class="card" id="val-review-card" style="display:none">
+    <div class="card-body">
+      <p class="card-title">Hash pendiente de validar</p>
+      <div class="space-s">
+        <div>
+          <label class="field-label">Hash</label>
+          <p id="val-hash" class="hash-text" style="padding:.45rem .75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;word-break:break-all"></p>
+        </div>
+        <div>
+          <label class="field-label">Descripción</label>
+          <p id="val-label" style="padding:.45rem .75rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text-muted)"></p>
+        </div>
+        <div>
+          <label class="field-label">Canal asignado <span style="font-weight:400;color:var(--text-dim)">(clic para cambiar)</span></label>
+          <div id="val-channel-display" onclick="openValChannelPicker()"
+               style="cursor:pointer;padding:.55rem .75rem;background:var(--surface2);border:1px solid var(--border2);border-radius:6px"></div>
+          <div id="val-channel-picker" style="display:none;margin-top:.5rem">
+            <div class="ss-wrap" id="val-channel-wrap"></div>
+            <div style="display:flex;gap:.5rem;margin-top:.5rem">
+              <button class="btn btn-primary btn-sm" onclick="confirmValChannel()">Confirmar canal</button>
+              <button class="btn btn-ghost btn-sm" onclick="cancelValChannelPicker()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between">
+        <button class="btn btn-ghost btn-sm" onclick="skipValidation()">Saltar por ahora</button>
+        <button id="val-accept-btn" class="btn btn-primary" onclick="acceptValidation()">✓ Aceptar asignación</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="val-empty-card" style="display:none">
+    <div class="card-body" style="text-align:center;padding:2rem;color:var(--text-muted)"></div>
+  </div>
+
 </section>
 
 <!-- ════════════════════════════ FEEDS ═══════════════════════════════════════ -->
@@ -1665,6 +1722,7 @@ class SearchableSelect {
 
 let mapChannelSS;
 let bulkAssignSS;
+let valChannelSS;
 
 document.addEventListener('DOMContentLoaded', () => {
   mapChannelSS = new SearchableSelect(
@@ -1675,6 +1733,11 @@ document.addEventListener('DOMContentLoaded', () => {
   bulkAssignSS = new SearchableSelect(
     document.getElementById('bulk-assign-channel-wrap'),
     '— Sin vincular —',
+    null
+  );
+  valChannelSS = new SearchableSelect(
+    document.getElementById('val-channel-wrap'),
+    'Buscar canal…',
     null
   );
   loadAll();
@@ -2311,6 +2374,7 @@ async function loadSources() {
   rebuildGroupFilter();
   filterSources();
   updateBulkBar();
+  updateValTabBadge();
 }
 
 function rebuildChannelFilter() {
@@ -2558,6 +2622,110 @@ function clearSourceFilters() {
   });
   _updateBulkBarMode(false);
   filterSources();
+}
+
+// ── Validation queue ──────────────────────────────────────────────────────────
+let valCurrent  = null;  // item currently shown in the review card
+let valLastId   = null;  // id of the last item shown, used to "skip" it via after_id
+
+function updateValTabBadge() {
+  const n = sources.filter(s => !s.validated && !s.deleted).length;
+  const badge = document.getElementById('val-tab-badge');
+  badge.style.display = n > 0 ? '' : 'none';
+  badge.textContent = n;
+  const counter = document.getElementById('val-counter');
+  if (counter) {
+    counter.textContent = n > 0 ? `${n} pendientes` : 'Todo validado';
+    counter.className   = 'badge ' + (n > 0 ? 'badge-yellow' : 'badge-green');
+  }
+}
+
+function startValidation() {
+  document.getElementById('val-intro-card').style.display = 'none';
+  valLastId = null;
+  loadNextValidation();
+}
+
+async function loadNextValidation(afterId) {
+  cancelValChannelPicker();
+  let url = '/api/sources/validation/next';
+  if (afterId != null) url += `?after_id=${afterId}`;
+  const r = await api('GET', url);
+  updateValCounterFromRemaining(r.remaining);
+  if (!r.item) {
+    valCurrent = null;
+    document.getElementById('val-review-card').style.display = 'none';
+    const empty = document.getElementById('val-empty-card');
+    empty.style.display = '';
+    empty.querySelector('.card-body').innerHTML = r.remaining > 0
+      ? `Sin más hashes en este recorrido — quedan ${r.remaining} saltados por validar.
+         <br><button class="btn btn-ghost" style="margin-top:1rem" onclick="startValidation()">↺ Volver al principio</button>`
+      : '✓ No quedan hashes pendientes de validar.';
+    return;
+  }
+  valCurrent = r.item;
+  valLastId  = r.item.id;
+  document.getElementById('val-empty-card').style.display  = 'none';
+  document.getElementById('val-review-card').style.display = '';
+  renderValItem();
+}
+
+function updateValCounterFromRemaining(remaining) {
+  const counter = document.getElementById('val-counter');
+  counter.textContent = remaining > 0 ? `${remaining} pendientes` : 'Todo validado';
+  counter.className   = 'badge ' + (remaining > 0 ? 'badge-yellow' : 'badge-green');
+  const badge = document.getElementById('val-tab-badge');
+  badge.style.display = remaining > 0 ? '' : 'none';
+  badge.textContent = remaining;
+}
+
+function renderValItem() {
+  document.getElementById('val-hash').textContent  = valCurrent.ace_hash;
+  document.getElementById('val-label').textContent = valCurrent.label || '—';
+  renderValChannelDisplay();
+  document.getElementById('val-accept-btn').style.display = valCurrent.channel ? '' : 'none';
+}
+
+function renderValChannelDisplay() {
+  const disp = document.getElementById('val-channel-display');
+  disp.innerHTML = valCurrent.channel
+    ? `<span class="badge badge-green">${esc(valCurrent.channel.name)}</span>
+       <span style="color:var(--text-dim);font-size:.8rem">— ${esc(valCurrent.channel.tvg_id)}</span>`
+    : `<span class="badge badge-gray">Sin canal asignado</span>`;
+}
+
+function openValChannelPicker() {
+  document.getElementById('val-channel-picker').style.display = '';
+  valChannelSS.setOptions(channels.map(c => ({ value: String(c.id), label: `${c.name} — ${c.tvg_id}` })));
+  valChannelSS.setValue(valCurrent.channel ? String(valCurrent.channel.id) : '');
+}
+
+function cancelValChannelPicker() {
+  const picker = document.getElementById('val-channel-picker');
+  if (picker) picker.style.display = 'none';
+}
+
+async function confirmValChannel() {
+  const channelId = valChannelSS.getValue();
+  if (!channelId) { alert('Elige un canal de la lista.'); return; }
+  try {
+    await api('PATCH', `/api/sources/${valCurrent.id}/validate`, { channel_id: +channelId });
+    await Promise.all([loadSources(), loadChannels()]);
+    await loadNextValidation();
+  } catch(e) { alert(e.message); }
+}
+
+async function acceptValidation() {
+  if (!valCurrent || !valCurrent.channel) return;
+  try {
+    await api('PATCH', `/api/sources/${valCurrent.id}/validate`, {});
+    await loadSources();
+    await loadNextValidation();
+  } catch(e) { alert(e.message); }
+}
+
+function skipValidation() {
+  loadNextValidation(valLastId);
 }
 
 function renderSources(list) {
