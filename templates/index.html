@@ -2815,25 +2815,27 @@ function renderSourceSectionHeader(key, grp, collapsed) {
         <span style="color:var(--text-dim);display:inline-block;width:.9rem">${arrow}</span>
         ${title}
         <span class="badge badge-gray" style="font-size:.65rem">${count} hash${count !== 1 ? 'es' : ''}</span>
-        ${ch ? epgSummaryHtml(ch.tvg_id) : ''}
       </div>
+      ${ch ? `<div style="margin:.3rem 0 0 1.45rem">${epgSummaryHtml(ch.tvg_id)}</div>` : ''}
     </td>
   </tr>`;
 }
 
 function epgSummaryHtml(tvgId) {
   const g = epgGuide[tvgId];
-  if (!g || (!g.current && !g.next)) return '';
-  let html = '';
+  if (!g || (!g.current && !g.next)) {
+    return '<span style="font-size:.7rem;color:var(--text-dim)">Sin datos EPG</span>';
+  }
+  const parts = [];
   if (g.current) {
     const stop = new Date(g.current.stop).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    html += `<span style="font-size:.72rem;color:var(--text-muted)">▶ <strong>${esc(g.current.title)}</strong> · hasta ${stop}</span>`;
+    parts.push(`<span style="font-size:.72rem;color:var(--text-muted)">▶ En emisión: <strong>${esc(g.current.title)}</strong> · hasta ${stop}</span>`);
   }
   if (g.next) {
     const start = new Date(g.next.start).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    html += `<span style="font-size:.72rem;color:var(--text-dim)">· Luego: ${esc(g.next.title)} · ${start}</span>`;
+    parts.push(`<span style="font-size:.72rem;color:var(--text-dim)">A continuación: ${esc(g.next.title)} · ${start}</span>`);
   }
-  return html;
+  return parts.join(' &nbsp;·&nbsp; ');
 }
 
 function toggleSourceSection(key) {
